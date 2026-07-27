@@ -1,0 +1,25 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Dependencies
+node_modules
+
+# Build
+dist
+dist-ssr
+src-tauri/target
+src-tauri/gen
+
+# Editor / local
+.DS_Store
+*.local
+.env.path
+.vscode/*
+!.vscode/extensions.json
+tsconfig.tsbuildinfo
+
+# Vault files (never commit secrets)
+*.vault
+*.vault.tmp
