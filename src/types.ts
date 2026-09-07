@@ -1,4 +1,4 @@
-export type EntryType = "secret" | "command" | "note";
+export type EntryType = "secret" | "command" | "note" | "jasper" | "file";
 
 export interface Entry {
   id: string;
@@ -10,6 +10,11 @@ export interface Entry {
   url: string;
   tags: string[];
   favorite: boolean;
+  fileName: string;
+  mimeType: string;
+  /** Base64 file bytes (binary). JRXML text may be in `body` instead. */
+  fileContent: string;
+  byteSize: number;
   createdAt: string;
   updatedAt: string;
   lastUsedAt: string | null;
@@ -41,9 +46,20 @@ export interface UpsertPayload {
   url?: string;
   tags?: string[];
   favorite?: boolean;
+  fileName?: string;
+  mimeType?: string;
+  fileContent?: string;
+  byteSize?: number;
 }
 
-export type FilterKind = "all" | "secret" | "command" | "note" | "favorite";
+export type FilterKind =
+  | "all"
+  | "secret"
+  | "command"
+  | "note"
+  | "jasper"
+  | "file"
+  | "favorite";
 
 export interface ImportDraft {
   type: EntryType;
@@ -68,4 +84,14 @@ export interface ImportPreview {
 export interface ImportResult {
   imported: number;
   entryCount: number;
+}
+
+export interface FileAttachment {
+  fileName: string;
+  mimeType: string;
+  fileContent: string;
+  body: string;
+  byteSize: number;
+  suggestedTitle: string;
+  isText: boolean;
 }

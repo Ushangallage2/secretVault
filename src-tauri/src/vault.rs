@@ -50,7 +50,14 @@ pub enum EntryType {
     Secret,
     Command,
     Note,
+    /// JasperReports source (.jrxml) or compiled (.jasper) — first-class in the UI.
+    Jasper,
+    /// Any other attached file stored inside the encrypted vault.
+    File,
 }
+
+/// Soft/hard limits for attachments stored inside the encrypted JSON vault.
+pub const MAX_ATTACHMENT_BYTES: usize = 2 * 1024 * 1024;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -71,6 +78,16 @@ pub struct Entry {
     pub tags: Vec<String>,
     #[serde(default)]
     pub favorite: bool,
+    /// Original filename for jasper / file entries.
+    #[serde(default)]
+    pub file_name: String,
+    #[serde(default)]
+    pub mime_type: String,
+    /// Base64-encoded file bytes (binary attachments). Text JRXML may live in `body` instead.
+    #[serde(default)]
+    pub file_content: String,
+    #[serde(default)]
+    pub byte_size: u64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     #[serde(default)]

@@ -3,11 +3,15 @@ mod keychain;
 mod vault;
 
 use importer::{drafts_to_entries, preview_paths, ImportDraft, ImportPreview};
+use base64::Engine;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 use std::sync::Arc;
 use tauri::State;
-use vault::{Entry, EntryType, OpenVault, VaultData, VaultError, VaultSettings};
+use vault::{
+    Entry, EntryType, OpenVault, VaultData, VaultError, VaultSettings, MAX_ATTACHMENT_BYTES,
+};
 
 struct AppState {
     vault: Mutex<Option<OpenVault>>,
@@ -49,6 +53,26 @@ struct UpsertPayload {
     tags: Vec<String>,
     #[serde(default)]
     favorite: bool,
+    #[serde(default)]
+    file_name: String,
+    #[serde(default)]
+    mime_type: String,
+    #[serde(default)]
+    file_content: String,
+    #[serde(default)]
+    byte_size: u64,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FileAttachment {
+    file_name: String,
+    mime_type: String,
+    file_content: String,
+    body: String,
+    byte_size: u64,
+    suggested_title: String,
+    is_text: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -168,9 +192,9 @@ fn list_entries(state: State<'_, Arc<AppState>>) -> Result<Vec<Entry>, String> {
 fn upsert_entry(state: State<'_, Arc<AppState>>, payload: UpsertPayload) -> Result<Entry, String> {
     state.with_vault_mut(|v| {
         let now = chrono::Utc::now();
-        let entry = Entry {
+        let mut entry = Entry {
             id: payload.id.unwrap_or_default(),
-            entry_type: payload.entry_type,
+            entry_type: payload.entry_type.clone(),
             title: payload.title.trim().to_string(),
             username: payload.username,
             password: payload.password,
@@ -178,6 +202,10 @@ fn upsert_entry(state: State<'_, Arc<AppState>>, payload: UpsertPayload) -> Resu
             url: payload.url,
             tags: payload.tags,
             favorite: payload.favorite,
+            file_name: payload.file_name,
+            mime_type: payload.mime_type,
+            file_content: payload.file_content,
+            byte_size: payload.byte_size,
             created_at: now,
             updated_at: now,
             last_used_at: None,
@@ -185,16 +213,178 @@ fn upsert_entry(state: State<'_, Arc<AppState>>, payload: UpsertPayload) -> Resu
         if entry.title.is_empty() {
             return Err(VaultError::msg("title is required"));
         }
+
+        // Auto-tag jasper entries so they stay easy to find.
+        if entry.entry_type == EntryType::Jasper
+            && !entry.tags.iter().any(|t| t.eq_ignore_ascii_case("jasper"))
+        {
+            entry.tags.push("jasper".into());
+        }
+
+        validate_attachment(&entry)?;
+
         if !entry.id.is_empty() {
             if let Some(old) = v.data.entries.iter().find(|e| e.id == entry.id) {
+                // Keep existing file payload if the client omitted it (e.g. favorite toggle).
+                if entry.file_content.is_empty() && !old.file_content.is_empty() {
+                    entry.file_content = old.file_content.clone();
+                    if entry.file_name.is_empty() {
+                        entry.file_name = old.file_name.clone();
+                    }
+                    if entry.mime_type.is_empty() {
+                        entry.mime_type = old.mime_type.clone();
+                    }
+                    if entry.byte_size == 0 {
+                        entry.byte_size = old.byte_size;
+                    }
+                }
+                if matches!(entry.entry_type, EntryType::Jasper | EntryType::File)
+                    && entry.body.is_empty()
+                    && !old.body.is_empty()
+                {
+                    entry.body = old.body.clone();
+                }
                 let mut merged = entry;
                 merged.created_at = old.created_at;
                 merged.last_used_at = old.last_used_at;
                 return v.upsert_entry(merged);
             }
         }
+
+        if matches!(entry.entry_type, EntryType::Jasper | EntryType::File)
+            && entry.file_content.is_empty()
+            && entry.body.is_empty()
+        {
+            return Err(VaultError::msg(
+                "attach a file before saving a Jasper or File entry",
+            ));
+        }
+
         v.upsert_entry(entry)
     })
+}
+
+fn validate_attachment(entry: &Entry) -> Result<(), VaultError> {
+    if !matches!(entry.entry_type, EntryType::Jasper | EntryType::File) {
+        return Ok(());
+    }
+    if entry.entry_type == EntryType::Jasper {
+        let name = entry.file_name.to_lowercase();
+        if !name.is_empty()
+            && !(name.ends_with(".jrxml") || name.ends_with(".jasper"))
+        {
+            return Err(VaultError::msg(
+                "Jasper entries must use a .jrxml or .jasper file",
+            ));
+        }
+    }
+    if !entry.file_content.is_empty() {
+        let approx = (entry.file_content.len() * 3) / 4;
+        if approx > MAX_ATTACHMENT_BYTES {
+            return Err(VaultError::msg(format!(
+                "file too large (max {} KB)",
+                MAX_ATTACHMENT_BYTES / 1024
+            )));
+        }
+    }
+    if entry.body.len() > MAX_ATTACHMENT_BYTES {
+        return Err(VaultError::msg(format!(
+            "file too large (max {} KB)",
+            MAX_ATTACHMENT_BYTES / 1024
+        )));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn read_file_attachment(path: String) -> Result<FileAttachment, String> {
+    let path = Path::new(&path);
+    if !path.is_file() {
+        return Err("file not found".into());
+    }
+    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+    if bytes.len() > MAX_ATTACHMENT_BYTES {
+        return Err(format!(
+            "file too large ({} KB). Max is {} KB",
+            bytes.len() / 1024,
+            MAX_ATTACHMENT_BYTES / 1024
+        ));
+    }
+    let file_name = path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("file")
+        .to_string();
+    let ext = path
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    let mime_type = mime_for_ext(&ext);
+    let is_text = matches!(
+        ext.as_str(),
+        "jrxml" | "xml" | "txt" | "md" | "json" | "csv" | "sql" | "yml" | "yaml" | "properties" | "html" | "css" | "js" | "ts" | "sh"
+    );
+    let body = if is_text {
+        String::from_utf8_lossy(&bytes).to_string()
+    } else {
+        String::new()
+    };
+    // Always keep exact bytes as base64 so export is lossless.
+    let file_content = base64::engine::general_purpose::STANDARD.encode(&bytes);
+    let suggested_title = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or(&file_name)
+        .to_string();
+
+    Ok(FileAttachment {
+        file_name,
+        mime_type,
+        file_content,
+        body,
+        byte_size: bytes.len() as u64,
+        suggested_title,
+        is_text,
+    })
+}
+
+#[tauri::command]
+fn export_entry_file(state: State<'_, Arc<AppState>>, id: String, dest: String) -> Result<(), String> {
+    state.with_vault(|v| {
+        let entry = v
+            .data
+            .entries
+            .iter()
+            .find(|e| e.id == id)
+            .ok_or_else(|| VaultError::msg("entry not found"))?;
+        let bytes = if !entry.file_content.is_empty() {
+            base64::engine::general_purpose::STANDARD
+                .decode(&entry.file_content)
+                .map_err(|e| VaultError::msg(format!("corrupt file data: {e}")))?
+        } else if !entry.body.is_empty() {
+            entry.body.as_bytes().to_vec()
+        } else {
+            return Err(VaultError::msg("this entry has no file data"));
+        };
+        std::fs::write(&dest, bytes).map_err(VaultError::from)?;
+        Ok(())
+    })
+}
+
+fn mime_for_ext(ext: &str) -> String {
+    match ext {
+        "jrxml" | "xml" => "application/xml",
+        "jasper" => "application/octet-stream",
+        "json" => "application/json",
+        "pdf" => "application/pdf",
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "txt" | "md" | "csv" | "sql" | "log" => "text/plain",
+        "zip" => "application/zip",
+        _ => "application/octet-stream",
+    }
+    .into()
 }
 
 #[tauri::command]
@@ -296,6 +486,8 @@ pub fn run() {
             preview_import,
             commit_import,
             default_import_paths,
+            read_file_attachment,
+            export_entry_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Secret Vault");

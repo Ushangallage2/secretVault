@@ -5,7 +5,7 @@
 use keyring::Entry;
 use std::path::{Path, PathBuf};
 
-const SERVICE: &str = "com.secretvault.app";
+const SERVICE: &str = "com.secretvault.desktop";
 
 /// Normalize vault path so store / has / load / clear all use the same Keychain account.
 fn account_for(path: &str) -> String {

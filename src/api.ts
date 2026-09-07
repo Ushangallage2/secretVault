@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   Entry,
+  FileAttachment,
   ImportDraft,
   ImportPreview,
   ImportResult,
@@ -37,4 +38,8 @@ export const api = {
   commitImport: (drafts: ImportDraft[]) =>
     invoke<ImportResult>("commit_import", { drafts }),
   defaultImportPaths: () => invoke<string[]>("default_import_paths"),
+  readFileAttachment: (path: string) =>
+    invoke<FileAttachment>("read_file_attachment", { path }),
+  exportEntryFile: (id: string, dest: string) =>
+    invoke<void>("export_entry_file", { id, dest }),
 };

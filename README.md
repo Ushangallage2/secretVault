@@ -8,13 +8,15 @@ Built with **Tauri 2 + React**. No cloud account required. Your data never leave
 
 ## Why this exists
 
-Dev and ops work often ends up as messy text dumps: curl recipes, DB users, VPN logins, Maven/Tomcat shortcuts, recovery codes. Secret Vault turns that into a searchable, filterable app with three clear buckets:
+Dev and ops work often ends up as messy text dumps: curl recipes, DB users, VPN logins, Maven/Tomcat shortcuts, recovery codes — plus Jasper report files. Secret Vault turns that into a searchable, filterable app:
 
 | Type | For |
 |------|-----|
 | **Secret** | Usernames, passwords, tokens, VPN, recovery codes |
 | **Command** | Shell, curl, SQL, build/deploy recipes you reuse |
 | **Note** | How-tos, config sheets, labels, snippets |
+| **Jasper** | `.jrxml` / `.jasper` reports (special preview + export) |
+| **File** | Any other file kept inside the encrypted vault |
 
 One master password unlocks everything. Export is just a copy of the encrypted file — move it to another Mac and unlock with the same password.
 
@@ -23,11 +25,13 @@ One master password unlocks everything. Export is just a copy of the encrypted f
 ## Features
 
 - Encrypted vault file (AES-256-GCM + Argon2id)
+- Entry types: Secret · Command · Note · **Jasper** · **File**
 - Search, favorites, type filters, tag dropdown
 - Copy to clipboard (clears after ~30s)
 - Auto-lock after idle
 - Optional **Stay signed in** via macOS Keychain (no password on every launch)
 - Import plain text / scratchpad files with review before save
+- Export Jasper / other attached files back to disk
 - Glassy dark UI
 
 ---

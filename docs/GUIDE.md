@@ -36,6 +36,10 @@ Older vault files from early builds still open; new saves use the current format
 - **Secret** — username + password (+ optional URL / notes). Password hidden until revealed.
 - **Command** — full command or multi-line snippet; one-click copy.
 - **Note** — free text (how-tos, sheets, labels).
+- **Jasper** — special vault for `.jrxml` / `.jasper` reports (preview JRXML, export for Jaspersoft Studio).
+- **File** — any other file stored inside the encrypted vault (max ~2 MB).
+
+Attachments live **inside** the `.vault` file (not as loose paths), so export/copy of the vault carries them too.
 
 ### Tags & favorites
 

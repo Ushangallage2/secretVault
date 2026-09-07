@@ -19,6 +19,8 @@ const FILTERS: { id: FilterKind; label: string }[] = [
   { id: "secret", label: "Secrets" },
   { id: "command", label: "Commands" },
   { id: "note", label: "Notes" },
+  { id: "jasper", label: "Jaspers" },
+  { id: "file", label: "Files" },
 ];
 
 export function Sidebar({
@@ -69,13 +71,19 @@ export function Sidebar({
             <button type="button" className="ghost" onClick={() => onNew("command")}>
               + Command
             </button>
+            <button type="button" className="ghost" onClick={() => onNew("note")}>
+              + Note
+            </button>
+            <button type="button" className="ghost jasper-add" onClick={() => onNew("jasper")}>
+              + Jasper
+            </button>
             <button
               type="button"
               className="ghost"
               style={{ gridColumn: "1 / -1" }}
-              onClick={() => onNew("note")}
+              onClick={() => onNew("file")}
             >
-              + Note
+              + Other file
             </button>
           </div>
         </div>

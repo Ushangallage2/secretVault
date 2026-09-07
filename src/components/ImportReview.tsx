@@ -98,6 +98,8 @@ export function ImportReview({ preview, busy, onClose, onConfirm }: Props) {
                       <option value="secret">Secret</option>
                       <option value="command">Command</option>
                       <option value="note">Note</option>
+                      <option value="jasper">Jasper</option>
+                      <option value="file">File</option>
                     </select>
                   </div>
                   <div className="entry-sub">

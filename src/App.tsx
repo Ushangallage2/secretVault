@@ -139,9 +139,19 @@ export default function App() {
         if (filter === "secret" && e.type !== "secret") return false;
         if (filter === "command" && e.type !== "command") return false;
         if (filter === "note" && e.type !== "note") return false;
+        if (filter === "jasper" && e.type !== "jasper") return false;
+        if (filter === "file" && e.type !== "file") return false;
         if (tagFilter && !e.tags.includes(tagFilter)) return false;
         if (!q) return true;
-        const hay = [e.title, e.username, e.body, e.url, e.tags.join(" ")]
+        const hay = [
+          e.title,
+          e.username,
+          e.body,
+          e.url,
+          e.fileName,
+          e.mimeType,
+          e.tags.join(" "),
+        ]
           .join(" ")
           .toLowerCase();
         return hay.includes(q);
@@ -208,7 +218,23 @@ export default function App() {
       url: entry.url,
       tags: entry.tags,
       favorite: !entry.favorite,
+      fileName: entry.fileName,
+      mimeType: entry.mimeType,
+      fileContent: entry.fileContent,
+      byteSize: entry.byteSize,
     });
+    await refresh();
+  };
+
+  const handleExportAttached = async (entry: Entry) => {
+    const dest = await save({
+      title: entry.type === "jasper" ? "Export Jasper file" : "Save file",
+      defaultPath: entry.fileName || `${entry.title}.bin`,
+    });
+    if (!dest) return;
+    await api.exportEntryFile(entry.id, dest);
+    showToast("File exported");
+    await api.touchEntry(entry.id);
     await refresh();
   };
 
@@ -307,8 +333,12 @@ export default function App() {
             password: "",
             body: "",
             url: "",
-            tags: [],
+            tags: type === "jasper" ? ["jasper"] : [],
             favorite: false,
+            fileName: "",
+            mimeType: "",
+            fileContent: "",
+            byteSize: 0,
             createdAt: "",
             updatedAt: "",
             lastUsedAt: null,
@@ -359,6 +389,7 @@ export default function App() {
             onDelete={() => selected && void handleDelete(selected.id)}
             onCopy={copy}
             onToggleFavorite={() => selected && void toggleFavorite(selected)}
+            onExportFile={(e) => void handleExportAttached(e)}
           />
         </div>
       </main>

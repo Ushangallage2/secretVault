@@ -1,10 +1,18 @@
 import { useState } from "react";
+import { open } from "@tauri-apps/plugin-dialog";
+import { api } from "../api";
 import type { Entry, EntryType, UpsertPayload } from "../types";
 
 interface Props {
   initial: Entry | null;
   onClose: () => void;
   onSave: (payload: UpsertPayload) => Promise<void>;
+}
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(2)} MB`;
 }
 
 export function EntryEditor({ initial, onClose, onSave }: Props) {
@@ -17,14 +25,61 @@ export function EntryEditor({ initial, onClose, onSave }: Props) {
   const [url, setUrl] = useState(initial?.url ?? "");
   const [tags, setTags] = useState((initial?.tags ?? []).join(", "));
   const [favorite, setFavorite] = useState(initial?.favorite ?? false);
+  const [fileName, setFileName] = useState(initial?.fileName ?? "");
+  const [mimeType, setMimeType] = useState(initial?.mimeType ?? "");
+  const [fileContent, setFileContent] = useState(initial?.fileContent ?? "");
+  const [byteSize, setByteSize] = useState(initial?.byteSize ?? 0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const isFileType = type === "jasper" || type === "file";
+
+  const pickAttachment = async () => {
+    setError(null);
+    const filters =
+      type === "jasper"
+        ? [{ name: "Jasper files", extensions: ["jrxml", "jasper"] }]
+        : undefined;
+    const path = await open({
+      multiple: false,
+      filters,
+    });
+    if (!path || typeof path !== "string") return;
+    setBusy(true);
+    try {
+      const att = await api.readFileAttachment(path);
+      if (type === "jasper") {
+        const lower = att.fileName.toLowerCase();
+        if (!lower.endsWith(".jrxml") && !lower.endsWith(".jasper")) {
+          setError("Pick a .jrxml or .jasper file for Jasper entries");
+          return;
+        }
+      }
+      setFileName(att.fileName);
+      setMimeType(att.mimeType);
+      setFileContent(att.fileContent);
+      setByteSize(att.byteSize);
+      setBody(att.body);
+      if (!title.trim()) setTitle(att.suggestedTitle);
+      if (type === "jasper" && !tags.toLowerCase().includes("jasper")) {
+        setTags((t) => (t.trim() ? `${t}, jasper` : "jasper"));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     if (!title.trim()) {
       setError("Title is required");
+      return;
+    }
+    if (isFileType && !fileContent && !body && isNew) {
+      setError("Attach a file first");
       return;
     }
     setBusy(true);
@@ -42,6 +97,10 @@ export function EntryEditor({ initial, onClose, onSave }: Props) {
           .map((t) => t.trim())
           .filter(Boolean),
         favorite,
+        fileName,
+        mimeType,
+        fileContent,
+        byteSize,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -62,10 +121,23 @@ export function EntryEditor({ initial, onClose, onSave }: Props) {
 
           <label>
             Type
-            <select value={type} onChange={(e) => setType(e.target.value as EntryType)}>
+            <select
+              value={type}
+              onChange={(e) => {
+                const next = e.target.value as EntryType;
+                setType(next);
+                if (next === "jasper" || next === "file") {
+                  setUsername("");
+                  setPassword("");
+                  setUrl("");
+                }
+              }}
+            >
               <option value="secret">Secret</option>
               <option value="command">Command</option>
               <option value="note">Note</option>
+              <option value="jasper">Jasper file</option>
+              <option value="file">Other file</option>
             </select>
           </label>
 
@@ -95,17 +167,66 @@ export function EntryEditor({ initial, onClose, onSave }: Props) {
             </>
           )}
 
-          <label>
-            {type === "command" ? "Command / snippet" : "Notes / body"}
-            <textarea
-              rows={type === "command" ? 8 : 5}
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              spellCheck={type !== "command"}
-            />
-          </label>
+          {isFileType && (
+            <div className="file-attach-panel">
+              <div className="file-attach-row">
+                <button type="button" className="primary" disabled={busy} onClick={() => void pickAttachment()}>
+                  {fileName ? "Replace file…" : type === "jasper" ? "Choose .jrxml / .jasper…" : "Choose file…"}
+                </button>
+                {fileName && (
+                  <span className="file-meta">
+                    {fileName} · {formatBytes(byteSize)}
+                    {mimeType ? ` · ${mimeType}` : ""}
+                  </span>
+                )}
+              </div>
+              {type === "jasper" && (
+                <p className="hint" style={{ margin: "0.4rem 0 0" }}>
+                  Jasper vault entries keep report source/binary inside the encrypted vault.
+                  Prefer .jrxml for preview &amp; search.
+                </p>
+              )}
+            </div>
+          )}
 
-          {type !== "secret" && (
+          {type === "jasper" && (
+            <label>
+              JRXML preview / notes
+              <textarea
+                rows={10}
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                spellCheck={false}
+                placeholder="JRXML text appears here for .jrxml files"
+              />
+            </label>
+          )}
+
+          {type === "file" && (
+            <label>
+              Notes (optional)
+              <textarea
+                rows={4}
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                placeholder="Optional description"
+              />
+            </label>
+          )}
+
+          {!isFileType && (
+            <label>
+              {type === "command" ? "Command / snippet" : "Notes / body"}
+              <textarea
+                rows={type === "command" ? 8 : 5}
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                spellCheck={type !== "command"}
+              />
+            </label>
+          )}
+
+          {type !== "secret" && !isFileType && (
             <label>
               Username / context (optional)
               <input value={username} onChange={(e) => setUsername(e.target.value)} />
@@ -117,7 +238,7 @@ export function EntryEditor({ initial, onClose, onSave }: Props) {
             <input
               value={tags}
               onChange={(e) => setTags(e.target.value)}
-              placeholder="postgres, tomcat, curl"
+              placeholder={type === "jasper" ? "jasper, invoice, retail" : "postgres, tomcat, curl"}
             />
           </label>
 

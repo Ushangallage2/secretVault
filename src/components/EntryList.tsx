@@ -30,7 +30,11 @@ export function EntryList({ entries, selectedId, onSelect }: Props) {
             {e.title}
           </span>
           <span className="entry-sub">
-            {e.type === "secret" ? e.username || "—" : e.tags.slice(0, 3).map((t) => `#${t}`).join(" ") || "—"}
+            {e.type === "secret"
+              ? e.username || "—"
+              : e.type === "jasper" || e.type === "file"
+                ? e.fileName || e.tags.slice(0, 3).map((t) => `#${t}`).join(" ") || "—"
+                : e.tags.slice(0, 3).map((t) => `#${t}`).join(" ") || "—"}
           </span>
         </button>
       ))}

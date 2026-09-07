@@ -18,6 +18,8 @@
   --secret: #7ec0ff;
   --command: #f0c35a;
   --note: #c4b0e8;
+  --jasper: #ff9f6b;
+  --file: #8fd4c1;
   --radius: 12px;
   --radius-lg: 20px;
   --shadow: 0 24px 64px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.04);
@@ -719,6 +721,51 @@ code,
 
 .type-pill.note {
   color: var(--note);
+  border-color: rgba(196, 176, 232, 0.35);
+}
+
+.type-pill.jasper {
+  color: var(--jasper);
+  border-color: rgba(255, 159, 107, 0.4);
+  font-weight: 700;
+}
+
+.type-pill.file {
+  color: var(--file);
+  border-color: rgba(143, 212, 193, 0.35);
+}
+
+.file-attach-panel {
+  margin-bottom: 0.85rem;
+  padding: 0.75rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 159, 107, 0.25);
+  background: rgba(255, 159, 107, 0.06);
+}
+
+.file-attach-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.file-meta {
+  font-size: 0.82rem;
+  color: var(--muted);
+  word-break: break-all;
+}
+
+.jasper-preview {
+  max-height: 420px;
+  overflow: auto;
+  font-size: 0.78rem;
+}
+
+button.jasper-add {
+  border-color: rgba(255, 159, 107, 0.35);
+  color: var(--jasper);
+}
   border-color: rgba(196, 176, 232, 0.35);
   background: rgba(196, 176, 232, 0.08);
 }
