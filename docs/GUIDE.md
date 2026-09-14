@@ -110,7 +110,7 @@ A banner offers the same after unlock (and on the unlock screen) without force-r
 
 Install **0.2.2 once** from the GitHub `.dmg` for **this Mac** (Intel is `x64`; Apple Silicon is `aarch64`) or from the 0.2.1 download notice. After that, 0.2.3+ can use Install update and restart.
 
-To publish an update: bump `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml`, then push `main` and tag `v<version>`. Actions signs artifacts and attaches `latest.json` plus installers to GitHub Release `v<version>`.
+To publish an update: bump `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml`, push `main`, then tag and push `v<version>`. Actions signs artifacts, attaches installers, and rebuilds a complete `latest.json` after every platform job finishes.
 
 ### Move to another computer
 

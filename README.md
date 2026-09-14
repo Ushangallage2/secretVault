@@ -116,14 +116,14 @@ About can save installers that match this version for another person:
 - Linux installer (`.deb` / AppImage)
 - Windows `.exe`
 
-Place built files in `src-tauri/installers/` before bundling (Tauri names such as `Secret Vault_0.2.2_aarch64.dmg` are recognized), or attach them to the GitHub Release for this version (`v0.2.2`, etc.). Pushing `main` or a `v*` tag runs `.github/workflows/tauri-release.yml` (Linux, Windows, macOS via `tauri-action`). A Mac build will **not** contain fake `.deb` / `.exe` files — if Share shows none, build on that OS (below) or wait for Actions.
+Place built files in `src-tauri/installers/` before bundling (Tauri names such as `Secret Vault_0.2.2_aarch64.dmg` are recognized), or attach them to the GitHub Release for this version (`v0.2.2`, etc.). Pushing a `v*` tag (or running the workflow manually) runs `.github/workflows/tauri-release.yml` (Linux, Windows, macOS via `tauri-action`). A Mac build will **not** contain fake `.deb` / `.exe` files — if Share shows none, build on that OS (below) or wait for Actions.
 
 ### App updates after you push
 
 Installed copies do **not** hot-patch from a source push. From **0.2.2**, a signed GitHub Release can replace the app in place.
 
 1. Bump the same version in `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml` (for example `0.2.2` → `0.2.3`).
-2. Push `main` and tag `v0.2.3`. GitHub Actions signs installers with `TAURI_SIGNING_PRIVATE_KEY` and uploads `latest.json` to the GitHub Release.
+2. Push `main`, then tag `v0.2.3` and push the tag. GitHub Actions signs installers with `TAURI_SIGNING_PRIVATE_KEY`. After every platform job finishes, it rebuilds a complete `latest.json` from the release assets (so Intel and Apple Silicon keys are not overwritten by a faster job).
 3. An already-installed **0.2.2+** app checks `https://github.com/Ushangallage2/secretVault/releases/latest/download/latest.json`. About and a banner show **Current version** vs **Pending version**. The primary action is **Install update and restart** (download, overwrite this app, relaunch). **Download update** remains as a fallback and saves the installer for **this Mac** (Intel `x64` vs Apple Silicon `aarch64`), not the first `.dmg` GitHub lists.
 
 **0.2.0 / 0.2.1 cannot install in place.** Those builds only notice a newer GitHub Release. Install **0.2.2 once** from the notice or the `v0.2.2` `.dmg`. After that, 0.2.3+ can use Install update and restart.
@@ -153,7 +153,7 @@ npm run tauri build
 | Linux | `deb/*.deb` and `appimage/*.AppImage` |
 | Windows | `nsis/*-setup.exe` and `msi/*.msi` |
 
-Linux also needs WebKitGTK (for example `libwebkit2gtk-4.1-dev` on Ubuntu). Pushing `main` runs the same builds in `.github/workflows/tauri-release.yml` when Actions runners are available.
+Linux also needs WebKitGTK (for example `libwebkit2gtk-4.1-dev` on Ubuntu). Pushing a `v*` tag runs the same builds in `.github/workflows/tauri-release.yml` when Actions runners are available.
 
 ---
 

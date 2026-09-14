@@ -2,7 +2,6 @@ name: Release installers
 
 on:
   push:
-    branches: [main]
     tags:
       - "v*"
   workflow_dispatch:
@@ -16,7 +15,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Both Mac arches: latest.json must list darwin-aarch64 and darwin-x86_64.
+          # Both Mac arches: the merge job lists darwin-aarch64 and darwin-x86_64.
           - platform: macos-latest
             args: --target aarch64-apple-darwin
           - platform: macos-latest
@@ -68,5 +67,21 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
-          uploadUpdaterJson: true
+          uploadUpdaterJson: false
           uploadUpdaterSignatures: true
+
+  merge-latest-json:
+    name: Rebuild latest.json
+    needs: publish-tauri
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check latest.json mapping
+        run: python3 scripts/merge-latest-json.py --self-test
+
+      - name: Rebuild complete latest.json from release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/merge-latest-json.py
