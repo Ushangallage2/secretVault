@@ -24,6 +24,10 @@ tsconfig.tsbuildinfo
 *.vault
 *.vault.tmp
 
+# Tauri updater private key — pubkey only lives in tauri.conf.json
+secret-vault.key
+.env.tauri-signing
+
 # Platform installers live on GitHub Releases, not in git
 src-tauri/installers/*
 !src-tauri/installers/README.txt

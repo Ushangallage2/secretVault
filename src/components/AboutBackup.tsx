@@ -3,6 +3,7 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { api, type AppAbout, type BackupStatus, type InstallerInfo, type UpdateInfo } from "../api";
+import { UpdateOffer } from "./UpdateOffer";
 import type { VaultSettings } from "../types";
 
 interface Props {
@@ -147,38 +148,6 @@ export function AboutBackup({ settings, onClose, onToast, onSettings }: Props) {
     }
   };
 
-  const downloadPending = async () => {
-    const dest = await save({
-      title: "Save pending update",
-      defaultPath: update?.filename ?? "Secret-Vault-update.dmg",
-    });
-    if (!dest) return;
-    setBusy(true);
-    try {
-      const msg = await api.downloadUpdate(dest);
-      onToast(msg);
-    } catch (err) {
-      onToast(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const updateStatusText = () => {
-    if (!update) return "Checking GitHub Releases…";
-    if (update.pending && update.latest) {
-      return `Pending version to download: v${update.latest}`;
-    }
-    if (update.status === "upToDate") {
-      return "You’re up to date — no pending update.";
-    }
-    if (update.status === "noRelease") {
-      return "No GitHub Release published yet. This copy is current until a newer version is released.";
-    }
-    if (update.error) return update.error;
-    return "Could not check for updates.";
-  };
-
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal about-modal" onClick={(e) => e.stopPropagation()}>
@@ -190,36 +159,13 @@ export function AboutBackup({ settings, onClose, onToast, onSettings }: Props) {
           <p className="about-credit">developed by {about?.developer ?? "Ushan Gallage"}</p>
 
           <h3 className="about-h">Updates</h3>
-          <p className="muted tiny">
-            Current version: <strong>v{update?.current ?? about?.version ?? "…"}</strong>
-          </p>
-          <p className={update?.pending ? "update-pending-text" : "muted tiny"}>{updateStatusText()}</p>
-          {update?.notes && <p className="muted tiny update-notes">{update.notes}</p>}
-          <div className="update-actions">
-            <button
-              type="button"
-              className="ghost"
-              disabled={busy}
-              onClick={() => void refreshMeta()}
-            >
-              Check for updates
-            </button>
-            {update?.pending && (
-              <button
-                type="button"
-                className="primary"
-                disabled={busy || !update.downloadUrl}
-                onClick={() => void downloadPending()}
-              >
-                Download update
-              </button>
-            )}
-            {update?.htmlUrl && (
-              <button type="button" className="subtle" onClick={() => void openUrl(update.htmlUrl!)}>
-                Open release
-              </button>
-            )}
-          </div>
+          <UpdateOffer
+            update={update}
+            variant="about"
+            busy={busy}
+            onToast={onToast}
+            onRefresh={refreshMeta}
+          />
 
           <h3 className="about-h">Share this version</h3>
           <p className="muted tiny">

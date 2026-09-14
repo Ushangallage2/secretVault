@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { api } from "../api";
+import { api, type UpdateInfo } from "../api";
 import type { SessionInfo } from "../types";
+import { UpdateOffer } from "./UpdateOffer";
 
 const REMEMBER_KEY = "secret-vault-remember-unlock";
 /** Set when user locks in-app; cleared on cold start so auto-unlock only runs on launch. */
@@ -34,6 +35,8 @@ export function UnlockScreen({
   );
   const [hasKeychain, setHasKeychain] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [update, setUpdate] = useState<UpdateInfo | null>(null);
+  const [updateToast, setUpdateToast] = useState<string | null>(null);
   const [autoPhase, setAutoPhase] = useState<AutoPhase>(() => {
     const p = (lastPath ?? "").trim();
     const skip = sessionStorage.getItem(SKIP_AUTO_KEY) === "1";
@@ -42,6 +45,13 @@ export function UnlockScreen({
       : "skipped";
   });
   const autoTried = useRef(false);
+
+  useEffect(() => {
+    void api
+      .checkForUpdate()
+      .then(setUpdate)
+      .catch(() => setUpdate(null));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -217,14 +227,24 @@ export function UnlockScreen({
 
   return (
     <div className="unlock">
-      <div className="unlock-card">
-        <div className="brand">
-          <div className="brand-mark" aria-hidden />
-          <div>
-            <h1>Secret Vault</h1>
-            <p>Encrypted secrets & commands · local only</p>
+      <div className="unlock-stack">
+        <UpdateOffer
+          update={update}
+          variant="unlock"
+          onToast={(msg) => {
+            setUpdateToast(msg);
+            window.setTimeout(() => setUpdateToast(null), 4000);
+          }}
+        />
+        {updateToast && <div className="toast">{updateToast}</div>}
+        <div className="unlock-card">
+          <div className="brand">
+            <div className="brand-mark" aria-hidden />
+            <div>
+              <h1>Secret Vault</h1>
+              <p>Encrypted secrets & commands · local only</p>
+            </div>
           </div>
-        </div>
 
         <div className="mode-tabs" role="tablist">
           <button
@@ -340,6 +360,7 @@ export function UnlockScreen({
           AES-256-GCM · Argon2id · one encrypted <code>.vault</code> file you can
           copy to another Mac and open with the same password.
         </p>
+        </div>
       </div>
     </div>
   );

@@ -32,10 +32,10 @@ One master password unlocks everything. Export is just a copy of the encrypted f
 - Optional **Stay signed in** via macOS Keychain (no password on every launch)
 - Sidebar **Log out** locks the session and returns to the unlock screen (stay signed in still applies on the next launch unless you turn it off)
 - **Cloud backup** of the encrypted `.vault` (folder / Google Drive, auto or manual)
-- **About** with version, “developed by Ushan Gallage”, sharing installers, and **current vs pending update** from GitHub Releases
+- **About** with version, “developed by Ushan Gallage”, sharing installers, and **Install update and restart** (in-place) plus a GitHub download fallback
 - Import plain text / scratchpad files with review before save
 - Export Jasper / other attached files back to disk
-- Glassy dark UI
+- Dark luxury gold UI (metallic primary buttons, gold-glow titles — the 0.2.2 look vs 0.2.1’s light champagne accents)
 
 ---
 
@@ -116,19 +116,21 @@ About can save installers that match this version for another person:
 - Linux installer (`.deb` / AppImage)
 - Windows `.exe`
 
-Place built files in `src-tauri/installers/` before bundling (Tauri names such as `Secret Vault_0.2.1_aarch64.dmg` are recognized), or attach them to the GitHub Release for this version (`v0.2.1`, etc.). Pushing `main` runs `.github/workflows/tauri-release.yml` (Linux, Windows, macOS via `tauri-action`). A Mac build will **not** contain fake `.deb` / `.exe` files — if Share shows none, build on that OS (below) or wait for Actions.
+Place built files in `src-tauri/installers/` before bundling (Tauri names such as `Secret Vault_0.2.2_aarch64.dmg` are recognized), or attach them to the GitHub Release for this version (`v0.2.2`, etc.). Pushing `main` or a `v*` tag runs `.github/workflows/tauri-release.yml` (Linux, Windows, macOS via `tauri-action`). A Mac build will **not** contain fake `.deb` / `.exe` files — if Share shows none, build on that OS (below) or wait for Actions.
 
 ### App updates after you push
 
-Installed copies do **not** hot-patch from a source push. Publish a new version like this:
+Installed copies do **not** hot-patch from a source push. From **0.2.2**, a signed GitHub Release can replace the app in place.
 
-1. Bump the same version in `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml` (for example `0.2.1` → `0.2.2`).
-2. Push `main`. GitHub Actions builds installers and publishes **GitHub Release** `v0.2.1`.
-3. An already-installed app checks `https://api.github.com/repos/Ushangallage2/secretVault/releases/latest` (no `gh` token). If that release is newer, About and a banner show **Current version** vs **Pending version to download**, with **Download update**.
+1. Bump the same version in `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml` (for example `0.2.2` → `0.2.3`).
+2. Push `main` and tag `v0.2.3`. GitHub Actions signs installers with `TAURI_SIGNING_PRIVATE_KEY` and uploads `latest.json` to the GitHub Release.
+3. An already-installed **0.2.2+** app checks `https://github.com/Ushangallage2/secretVault/releases/latest/download/latest.json`. About and a banner show **Current version** vs **Pending version**. The primary action is **Install update and restart** (download, overwrite this app, relaunch). **Download update** remains as a fallback and saves the installer for **this Mac** (Intel `x64` vs Apple Silicon `aarch64`), not the first `.dmg` GitHub lists.
+
+**0.2.0 / 0.2.1 cannot install in place.** Those builds only notice a newer GitHub Release. Install **0.2.2 once** from the notice or the `v0.2.2` `.dmg`. After that, 0.2.3+ can use Install update and restart.
 
 Do not bump the version on every docs-only commit — only when you want users to be offered a new installer.
 
-Signed in-place auto-install (Tauri updater + minisign) is optional later: generate a keypair with `npm run tauri signer generate`, put **only the public key** in the repo, and store the private key as GitHub secret `TAURI_SIGNING_PRIVATE_KEY`. Never commit the private key. Until that is wired, Download update saves the GitHub Release installer.
+The updater **public** key lives in `src-tauri/tauri.conf.json`. The private key is a GitHub Actions secret (`TAURI_SIGNING_PRIVATE_KEY`, plus `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` if the key is password-protected). Never commit the private key. If those secrets are missing, Actions cannot sign artifacts and in-place install will fail until they are set.
 
 ---
 

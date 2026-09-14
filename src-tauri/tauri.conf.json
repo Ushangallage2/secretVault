@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Secret Vault",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "identifier": "com.secretvault.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -36,6 +36,15 @@
     ],
     "resources": [
       "installers/**/*"
-    ]
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEMyQzdGRUQ4QzI1NjZEOUIKUldTYmJWYkMyUDdId29BQzZUVDAxR3NBVUtienIzSWxmOWM3U2ExOWtvVTdTRmlRSHptOVNkQ3EK",
+      "endpoints": [
+        "https://github.com/Ushangallage2/secretVault/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

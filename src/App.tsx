@@ -18,6 +18,7 @@ import { EntryDetail } from "./components/EntryDetail";
 import { EntryEditor } from "./components/EntryEditor";
 import { ImportReview } from "./components/ImportReview";
 import { AboutBackup } from "./components/AboutBackup";
+import { UpdateOffer } from "./components/UpdateOffer";
 
 const LAST_PATH_KEY = "secret-vault-last-path";
 const REMEMBER_KEY = "secret-vault-remember-unlock";
@@ -174,21 +175,6 @@ export default function App() {
   }, [entries, query, filter, tagFilter]);
 
   const selected = entries.find((e) => e.id === selectedId) ?? null;
-
-  const downloadPendingUpdate = async () => {
-    if (!update?.pending) return;
-    const dest = await save({
-      title: "Save pending update",
-      defaultPath: update.filename ?? "Secret-Vault-update.dmg",
-    });
-    if (!dest) return;
-    try {
-      const msg = await api.downloadUpdate(dest);
-      showToast(msg);
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : String(err));
-    }
-  };
 
   const copy = async (text: string, label: string, entryId?: string) => {
     if (!text) return;
@@ -403,28 +389,12 @@ export default function App() {
             {filtered.length} / {entries.length}
           </div>
         </header>
-        {update?.pending && (
-          <div className="update-banner">
-            <span>
-              Current version <strong>v{update.current}</strong>
-              {" · "}
-              Pending update <strong>v{update.latest}</strong>
-            </span>
-            <div className="update-banner-actions">
-              <button type="button" className="ghost" onClick={() => setShowAbout(true)}>
-                Details
-              </button>
-              <button
-                type="button"
-                className="primary"
-                disabled={!update.downloadUrl}
-                onClick={() => void downloadPendingUpdate()}
-              >
-                Download update
-              </button>
-            </div>
-          </div>
-        )}
+        <UpdateOffer
+          update={update}
+          variant="banner"
+          onToast={showToast}
+          onDetails={() => setShowAbout(true)}
+        />
 
         <div className="content-split">
           <EntryList

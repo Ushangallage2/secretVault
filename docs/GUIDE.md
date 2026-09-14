@@ -101,9 +101,16 @@ From About, save a **real** installer when it exists (bundled `installers/` or t
 
 ### Updates
 
-About → **Updates** shows **Current version** (this running app) and checks GitHub Releases. If a newer release exists, it shows **Pending version to download** and **Download update**. A banner appears after unlock when an update is pending. You are not shown a fake pending version when you are already latest.
+About → **Updates** shows **Current version** (this running app) and checks GitHub Releases. If a newer release exists, it shows the pending version.
 
-To publish an update: bump `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml`, then push `main`. Actions attaches installers to GitHub Release `v<version>`.
+- **0.2.0 / 0.2.1** can only **Download update** (save a `.dmg`). They cannot replace the running app.
+- **0.2.2+** offers **Install update and restart** (signed in-place replace + relaunch). **Download update** remains as a fallback if signing is not ready yet.
+
+A banner offers the same after unlock (and on the unlock screen) without force-restarting. You are not shown a fake pending version when you are already latest.
+
+Install **0.2.2 once** from the GitHub `.dmg` for **this Mac** (Intel is `x64`; Apple Silicon is `aarch64`) or from the 0.2.1 download notice. After that, 0.2.3+ can use Install update and restart.
+
+To publish an update: bump `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml`, then push `main` and tag `v<version>`. Actions signs artifacts and attaches `latest.json` plus installers to GitHub Release `v<version>`.
 
 ### Move to another computer
 

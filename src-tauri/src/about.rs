@@ -158,7 +158,7 @@ fn find_local_in(dirs: &[PathBuf], kind: &str) -> Option<PathBuf> {
 
 fn find_local(dir: &Path, kind: &str) -> Option<PathBuf> {
     let entries = fs::read_dir(dir).ok()?;
-    let mut matches: Vec<PathBuf> = entries
+    let matches: Vec<PathBuf> = entries
         .flatten()
         .map(|e| e.path())
         .filter(|p| p.is_file())
@@ -168,6 +168,30 @@ fn find_local(dir: &Path, kind: &str) -> Option<PathBuf> {
                 .unwrap_or(false)
         })
         .collect();
+    pick_local(kind, matches, host_cpu())
+}
+
+fn pick_local(kind: &str, matches: Vec<PathBuf>, cpu: CpuFamily) -> Option<PathBuf> {
+    if kind == "macos" {
+        for ext in preferred_exts(kind) {
+            let mut ranked: Vec<(u8, PathBuf)> = matches
+                .iter()
+                .filter_map(|p| {
+                    let name = p.file_name()?.to_string_lossy();
+                    if !name.to_lowercase().ends_with(ext) {
+                        return None;
+                    }
+                    macos_compat_rank(&name, cpu).map(|rank| (rank, p.clone()))
+                })
+                .collect();
+            ranked.sort_by(|(r1, p1), (r2, p2)| r1.cmp(r2).then(p1.cmp(p2)));
+            if let Some((_, path)) = ranked.into_iter().next() {
+                return Some(path);
+            }
+        }
+        return None;
+    }
+    let mut matches = matches;
     matches.sort();
     matches.pop()
 }
@@ -222,6 +246,59 @@ fn current_kind() -> &'static str {
         "linux"
     } else {
         "windows"
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CpuFamily {
+    Intel,
+    AppleSilicon,
+    Other,
+}
+
+fn host_cpu() -> CpuFamily {
+    if cfg!(target_arch = "x86_64") {
+        CpuFamily::Intel
+    } else if cfg!(target_arch = "aarch64") {
+        CpuFamily::AppleSilicon
+    } else {
+        CpuFamily::Other
+    }
+}
+
+fn macos_compat_rank(name: &str, cpu: CpuFamily) -> Option<u8> {
+    let n = name.to_lowercase();
+    let universal = n.contains("universal");
+    let apple = n.contains("aarch64") || n.contains("arm64");
+    let intel = n.contains("x86_64") || n.contains("x64");
+    match cpu {
+        CpuFamily::Intel => {
+            // Never hand an Apple Silicon–only build to an Intel Mac.
+            if apple && !universal {
+                return None;
+            }
+            Some(if intel {
+                0
+            } else if universal {
+                1
+            } else {
+                2
+            })
+        }
+        CpuFamily::AppleSilicon => {
+            // Don't pick an Intel-only x64.dmg on Apple Silicon.
+            if intel && !universal {
+                return None;
+            }
+            Some(if apple {
+                0
+            } else if universal {
+                1
+            } else {
+                2
+            })
+        }
+        CpuFamily::Other => Some(if universal { 1 } else { 2 }),
     }
 }
 
@@ -325,7 +402,38 @@ pub fn download_pending_update(dest: &Path) -> Result<String, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{match_kind, version_gt};
+    use super::{
+        match_github_for_arch, match_kind, macos_compat_rank, pick_local, version_gt, CpuFamily,
+        GhAsset,
+    };
+    use std::path::PathBuf;
+
+    fn assets(names: &[&str]) -> Vec<GhAsset> {
+        names
+            .iter()
+            .map(|name| GhAsset {
+                name: (*name).into(),
+                browser_download_url: format!(
+                    "https://github.com/Ushangallage2/secretVault/releases/download/v0.2.1/{name}"
+                ),
+            })
+            .collect()
+    }
+
+    /// GitHub’s v0.2.1 listing: aarch64.dmg is first, then x64.dmg.
+    fn v021_release_assets() -> Vec<GhAsset> {
+        assets(&[
+            "Secret.Vault-0.2.1-1.x86_64.rpm",
+            "Secret.Vault_0.2.1_aarch64.dmg",
+            "Secret.Vault_0.2.1_amd64.AppImage",
+            "Secret.Vault_0.2.1_amd64.deb",
+            "Secret.Vault_0.2.1_x64-setup.exe",
+            "Secret.Vault_0.2.1_x64.dmg",
+            "Secret.Vault_0.2.1_x64_en-US.msi",
+            "Secret.Vault_aarch64.app.tar.gz",
+            "Secret.Vault_x64.app.tar.gz",
+        ])
+    }
 
     #[test]
     fn matches_tauri_bundle_names() {
@@ -346,6 +454,83 @@ mod tests {
         assert!(!version_gt("0.2.0", "0.2.0"));
         assert!(!version_gt("0.2.0", "0.3.0"));
         assert!(!version_gt("not-a-version", "0.2.0"));
+    }
+
+    #[test]
+    fn intel_mac_prefers_x64_dmg_even_when_aarch64_listed_first() {
+        let list = v021_release_assets();
+        let picked = match_github_for_arch("macos", &list, CpuFamily::Intel).unwrap();
+        assert_eq!(picked.name, "Secret.Vault_0.2.1_x64.dmg");
+        assert!(!picked.name.to_lowercase().contains("aarch64"));
+        assert!(!picked.name.to_lowercase().contains("arm64"));
+    }
+
+    #[test]
+    fn apple_silicon_prefers_aarch64_dmg() {
+        let list = v021_release_assets();
+        let picked = match_github_for_arch("macos", &list, CpuFamily::AppleSilicon).unwrap();
+        assert_eq!(picked.name, "Secret.Vault_0.2.1_aarch64.dmg");
+    }
+
+    #[test]
+    fn intel_mac_prefers_x86_64_dmg_over_aarch64() {
+        let list = assets(&[
+            "Secret.Vault_0.2.2_aarch64.dmg",
+            "Secret.Vault_0.2.2_x86_64.dmg",
+        ]);
+        let picked = match_github_for_arch("macos", &list, CpuFamily::Intel).unwrap();
+        assert_eq!(picked.name, "Secret.Vault_0.2.2_x86_64.dmg");
+    }
+
+    #[test]
+    fn apple_silicon_prefers_arm64_dmg() {
+        let list = assets(&[
+            "Secret.Vault_0.2.2_x64.dmg",
+            "Secret.Vault_0.2.2_arm64.dmg",
+        ]);
+        let picked = match_github_for_arch("macos", &list, CpuFamily::AppleSilicon).unwrap();
+        assert_eq!(picked.name, "Secret.Vault_0.2.2_arm64.dmg");
+    }
+
+    #[test]
+    fn intel_mac_never_picks_aarch64_only_dmg() {
+        let list = assets(&["Secret.Vault_0.2.1_aarch64.dmg", "Secret.Vault_aarch64.app.tar.gz"]);
+        assert!(match_github_for_arch("macos", &list, CpuFamily::Intel).is_none());
+        assert!(macos_compat_rank("Secret.Vault_0.2.1_aarch64.dmg", CpuFamily::Intel).is_none());
+    }
+
+    #[test]
+    fn apple_silicon_skips_intel_only_x64_dmg() {
+        let list = assets(&["Secret.Vault_0.2.1_x64.dmg", "Secret.Vault_x64.app.tar.gz"]);
+        assert!(match_github_for_arch("macos", &list, CpuFamily::AppleSilicon).is_none());
+        assert!(macos_compat_rank("Secret.Vault_0.2.1_x64.dmg", CpuFamily::AppleSilicon).is_none());
+    }
+
+    #[test]
+    fn universal_dmg_ok_for_intel_and_apple_silicon() {
+        let list = assets(&["Secret.Vault_0.2.1_universal.dmg"]);
+        let intel = match_github_for_arch("macos", &list, CpuFamily::Intel).unwrap();
+        let arm = match_github_for_arch("macos", &list, CpuFamily::AppleSilicon).unwrap();
+        assert_eq!(intel.name, "Secret.Vault_0.2.1_universal.dmg");
+        assert_eq!(arm.name, "Secret.Vault_0.2.1_universal.dmg");
+    }
+
+    #[test]
+    fn share_macos_local_picks_this_machine_arch() {
+        let paths = vec![
+            PathBuf::from("Secret.Vault_0.2.1_aarch64.dmg"),
+            PathBuf::from("Secret.Vault_0.2.1_x64.dmg"),
+        ];
+        let intel = pick_local("macos", paths.clone(), CpuFamily::Intel).unwrap();
+        assert_eq!(
+            intel.file_name().unwrap().to_string_lossy(),
+            "Secret.Vault_0.2.1_x64.dmg"
+        );
+        let arm = pick_local("macos", paths, CpuFamily::AppleSilicon).unwrap();
+        assert_eq!(
+            arm.file_name().unwrap().to_string_lossy(),
+            "Secret.Vault_0.2.1_aarch64.dmg"
+        );
     }
 }
 
@@ -439,15 +624,41 @@ fn is_sidecar(name: &str) -> bool {
 }
 
 fn match_github<'a>(kind: &str, assets: &'a [GhAsset]) -> Option<&'a GhAsset> {
+    match_github_for_arch(kind, assets, host_cpu())
+}
+
+fn match_github_for_arch<'a>(
+    kind: &str,
+    assets: &'a [GhAsset],
+    cpu: CpuFamily,
+) -> Option<&'a GhAsset> {
+    let candidates: Vec<&'a GhAsset> = assets
+        .iter()
+        .filter(|a| !is_sidecar(&a.name) && match_kind(kind, &a.name))
+        .collect();
+
+    if kind == "macos" {
+        for ext in preferred_exts(kind) {
+            let mut ranked: Vec<(u8, &'a GhAsset)> = candidates
+                .iter()
+                .copied()
+                .filter(|a| a.name.to_lowercase().ends_with(ext))
+                .filter_map(|a| macos_compat_rank(&a.name, cpu).map(|rank| (rank, a)))
+                .collect();
+            ranked.sort_by(|(r1, a1), (r2, a2)| r1.cmp(r2).then(a1.name.cmp(&a2.name)));
+            if let Some((_, asset)) = ranked.into_iter().next() {
+                return Some(asset);
+            }
+        }
+        return None;
+    }
+
     for ext in preferred_exts(kind) {
-        if let Some(asset) = assets.iter().find(|a| {
-            let n = a.name.to_lowercase();
-            !is_sidecar(&a.name) && n.ends_with(ext) && match_kind(kind, &a.name)
-        }) {
+        if let Some(asset) = candidates.iter().copied().find(|a| a.name.to_lowercase().ends_with(ext)) {
             return Some(asset);
         }
     }
-    assets.iter().find(|a| match_kind(kind, &a.name))
+    candidates.into_iter().next()
 }
 
 fn download(url: &str, dest: &Path) -> Result<(), String> {
