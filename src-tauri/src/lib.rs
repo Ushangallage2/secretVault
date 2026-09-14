@@ -4,7 +4,7 @@ mod importer;
 mod keychain;
 mod vault;
 
-use about::{AppAbout, InstallerInfo};
+use about::{AppAbout, InstallerInfo, UpdateInfo};
 use backup::BackupStatus;
 use importer::{drafts_to_entries, preview_paths, ImportDraft, ImportPreview};
 use base64::Engine;
@@ -591,6 +591,32 @@ async fn save_installer(app: AppHandle, kind: String, dest: String) -> Result<St
     .map_err(|e| e.to_string())?
 }
 
+#[tauri::command]
+async fn check_for_update() -> UpdateInfo {
+    tauri::async_runtime::spawn_blocking(about::check_for_update)
+        .await
+        .unwrap_or_else(|e| UpdateInfo {
+            current: env!("CARGO_PKG_VERSION").into(),
+            latest: None,
+            pending: false,
+            download_url: None,
+            filename: None,
+            notes: None,
+            html_url: None,
+            status: "error".into(),
+            error: Some(e.to_string()),
+        })
+}
+
+#[tauri::command]
+async fn download_update(dest: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        about::download_pending_update(Path::new(&dest))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let state = Arc::new(AppState {
@@ -634,6 +660,8 @@ pub fn run() {
             store_drive_client_secret,
             list_installers,
             save_installer,
+            check_for_update,
+            download_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Secret Vault");

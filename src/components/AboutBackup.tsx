@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { api, type AppAbout, type BackupStatus, type InstallerInfo } from "../api";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { api, type AppAbout, type BackupStatus, type InstallerInfo, type UpdateInfo } from "../api";
 import type { VaultSettings } from "../types";
 
 interface Props {
@@ -11,10 +12,32 @@ interface Props {
   onSettings: (s: VaultSettings) => Promise<void>;
 }
 
+const CLONE_URL = "https://github.com/Ushangallage2/secretVault";
+const BUILD_GUIDE_URL = `${CLONE_URL}#build-installers-yourself`;
+
+const BUILD_HINTS: Record<string, { os: string; artifact: string; output: string }> = {
+  macos: {
+    os: "macOS",
+    artifact: ".dmg",
+    output: "src-tauri/target/release/bundle/dmg/",
+  },
+  linux: {
+    os: "Linux",
+    artifact: ".deb / AppImage",
+    output: "src-tauri/target/release/bundle/deb/ (and appimage/)",
+  },
+  windows: {
+    os: "Windows",
+    artifact: ".exe / .msi",
+    output: "src-tauri/target/release/bundle/nsis/ (and msi/)",
+  },
+};
+
 export function AboutBackup({ settings, onClose, onToast, onSettings }: Props) {
   const [about, setAbout] = useState<AppAbout | null>(null);
   const [status, setStatus] = useState<BackupStatus | null>(null);
   const [installers, setInstallers] = useState<InstallerInfo[]>([]);
+  const [update, setUpdate] = useState<UpdateInfo | null>(null);
   const [autoBackup, setAutoBackup] = useState(!!settings.autoBackup);
   const [backupFolder, setBackupFolder] = useState(settings.backupFolder ?? "");
   const [driveFolderUrl, setDriveFolderUrl] = useState(settings.driveFolderUrl ?? "");
@@ -25,6 +48,7 @@ export function AboutBackup({ settings, onClose, onToast, onSettings }: Props) {
   const refreshMeta = async () => {
     setStatus(await api.getBackupStatus());
     setInstallers(await api.listInstallers());
+    setUpdate(await api.checkForUpdate());
   };
 
   useEffect(() => {
@@ -123,46 +147,160 @@ export function AboutBackup({ settings, onClose, onToast, onSettings }: Props) {
     }
   };
 
+  const downloadPending = async () => {
+    const dest = await save({
+      title: "Save pending update",
+      defaultPath: update?.filename ?? "Secret-Vault-update.dmg",
+    });
+    if (!dest) return;
+    setBusy(true);
+    try {
+      const msg = await api.downloadUpdate(dest);
+      onToast(msg);
+    } catch (err) {
+      onToast(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const updateStatusText = () => {
+    if (!update) return "Checking GitHub Releases…";
+    if (update.pending && update.latest) {
+      return `Pending version to download: v${update.latest}`;
+    }
+    if (update.status === "upToDate") {
+      return "You’re up to date — no pending update.";
+    }
+    if (update.status === "noRelease") {
+      return "No GitHub Release published yet. This copy is current until a newer version is released.";
+    }
+    if (update.error) return update.error;
+    return "Could not check for updates.";
+  };
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal about-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-body">
           <h3>About this app</h3>
           <p className="about-version">
-            {about?.name ?? "Secret Vault"} <strong>v{about?.version ?? "…"}</strong>
+            {about?.name ?? "Secret Vault"} <strong>v{about?.version ?? update?.current ?? "…"}</strong>
           </p>
           <p className="about-credit">developed by {about?.developer ?? "Ushan Gallage"}</p>
 
+          <h3 className="about-h">Updates</h3>
+          <p className="muted tiny">
+            Current version: <strong>v{update?.current ?? about?.version ?? "…"}</strong>
+          </p>
+          <p className={update?.pending ? "update-pending-text" : "muted tiny"}>{updateStatusText()}</p>
+          {update?.notes && <p className="muted tiny update-notes">{update.notes}</p>}
+          <div className="update-actions">
+            <button
+              type="button"
+              className="ghost"
+              disabled={busy}
+              onClick={() => void refreshMeta()}
+            >
+              Check for updates
+            </button>
+            {update?.pending && (
+              <button
+                type="button"
+                className="primary"
+                disabled={busy || !update.downloadUrl}
+                onClick={() => void downloadPending()}
+              >
+                Download update
+              </button>
+            )}
+            {update?.htmlUrl && (
+              <button type="button" className="subtle" onClick={() => void openUrl(update.htmlUrl!)}>
+                Open release
+              </button>
+            )}
+          </div>
+
           <h3 className="about-h">Share this version</h3>
           <p className="muted tiny">
-            Give another person the installer that matches this app version — macOS .dmg, Linux installer, and Windows .exe.
-            Files come from this build’s <code>installers/</code> bundle if present, otherwise the GitHub Release for this version.
+            Save a real installer when one exists (bundled file or GitHub Release). This Mac build cannot invent
+            authentic Linux <code>.deb</code> or Windows <code>.exe</code> files — those have to be built on that OS
+            (or published later by GitHub Actions).
           </p>
           <div className="installer-list">
             {installers.length === 0 && <p className="muted tiny">Looking up installers…</p>}
-            {installers.map((item) => (
-              <div key={item.id} className={item.available ? "installer-row" : "installer-row unavailable"}>
-                <div>
-                  <strong>{item.label}</strong>
-                  <div className="muted tiny">{item.filename}</div>
-                  <div className="muted tiny">{item.source}</div>
+            {installers.map((item) => {
+              const hint = BUILD_HINTS[item.id];
+              return (
+                <div key={item.id} className={item.available ? "installer-row" : "installer-row missing"}>
+                  <div>
+                    <strong>{item.label}</strong>
+                    {item.available ? (
+                      <>
+                        <div className="muted tiny">{item.filename}</div>
+                        <div className="muted tiny">{item.source}</div>
+                      </>
+                    ) : (
+                      <p className="installer-hint">
+                        No real {hint?.artifact ?? "installer"} is in this copy
+                        {hint && item.id !== "macos"
+                          ? ` because it was not built on ${hint.os}`
+                          : ""}
+                        . Build it on {hint?.os ?? "that OS"}: clone{" "}
+                        <code>{CLONE_URL}</code>, then <code>npm install</code> and{" "}
+                        <code>npm run tauri build</code>. Typical output:{" "}
+                        <code>{hint?.output ?? "src-tauri/target/release/bundle/"}</code>
+                      </p>
+                    )}
+                  </div>
+                  <div className="installer-row-actions">
+                    {item.available ? (
+                      <button
+                        type="button"
+                        className="ghost"
+                        disabled={busy}
+                        onClick={() => void saveOneInstaller(item)}
+                      >
+                        Save file…
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          className="ghost"
+                          onClick={() =>
+                            void writeText(CLONE_URL).then(
+                              () => onToast("Clone URL copied"),
+                              (err) => onToast(err instanceof Error ? err.message : String(err)),
+                            )
+                          }
+                        >
+                          Copy clone URL
+                        </button>
+                        <button
+                          type="button"
+                          className="subtle"
+                          onClick={() => void openUrl(BUILD_GUIDE_URL)}
+                        >
+                          Open build guide
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  className="ghost"
-                  disabled={busy || !item.available}
-                  onClick={() => void saveOneInstaller(item)}
-                >
-                  {item.available ? "Save file…" : "Not yet"}
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
-          {about && (
-            <button type="button" className="subtle" onClick={() => void openUrl(about.releasesUrl)}>
-              Open GitHub releases
+          <div className="update-actions">
+            {about && (
+              <button type="button" className="subtle" onClick={() => void openUrl(about.releasesUrl)}>
+                Open GitHub releases
+              </button>
+            )}
+            <button type="button" className="subtle" onClick={() => void openUrl(BUILD_GUIDE_URL)}>
+              Open build guide
             </button>
-          )}
+          </div>
 
           <h3 className="about-h">Cloud backup</h3>
           <p className="muted tiny">

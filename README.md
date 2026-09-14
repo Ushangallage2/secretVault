@@ -32,7 +32,7 @@ One master password unlocks everything. Export is just a copy of the encrypted f
 - Optional **Stay signed in** via macOS Keychain (no password on every launch)
 - Sidebar **Log out** locks the session and returns to the unlock screen (stay signed in still applies on the next launch unless you turn it off)
 - **Cloud backup** of the encrypted `.vault` (folder / Google Drive, auto or manual)
-- **About** with version, “developed by Ushan Gallage”, and sharing macOS / Linux / Windows installers
+- **About** with version, “developed by Ushan Gallage”, sharing installers, and **current vs pending update** from GitHub Releases
 - Import plain text / scratchpad files with review before save
 - Export Jasper / other attached files back to disk
 - Glassy dark UI
@@ -116,7 +116,42 @@ About can save installers that match this version for another person:
 - Linux installer (`.deb` / AppImage)
 - Windows `.exe`
 
-Place built files in `src-tauri/installers/` before bundling (Tauri names such as `Secret Vault_0.2.0_aarch64.dmg` are recognized), or attach them to the GitHub Release for this version (`v0.2.0`, etc.). Pushing `main` runs `.github/workflows/tauri-release.yml` (Linux, Windows, macOS via `tauri-action`). Until an artifact exists locally or on that release, Save stays disabled.
+Place built files in `src-tauri/installers/` before bundling (Tauri names such as `Secret Vault_0.2.0_aarch64.dmg` are recognized), or attach them to the GitHub Release for this version (`v0.2.0`, etc.). Pushing `main` runs `.github/workflows/tauri-release.yml` (Linux, Windows, macOS via `tauri-action`). A Mac build will **not** contain fake `.deb` / `.exe` files — if Share shows none, build on that OS (below) or wait for Actions.
+
+### App updates after you push
+
+Installed copies do **not** hot-patch from a source push. Publish a new version like this:
+
+1. Bump the same version in `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml` (for example `0.2.0` → `0.2.1`).
+2. Push `main`. GitHub Actions builds installers and publishes **GitHub Release** `v0.2.1`.
+3. An already-installed app checks `https://api.github.com/repos/Ushangallage2/secretVault/releases/latest` (no `gh` token). If that release is newer, About and a banner show **Current version** vs **Pending version to download**, with **Download update**.
+
+Do not bump the version on every docs-only commit — only when you want users to be offered a new installer.
+
+Signed in-place auto-install (Tauri updater + minisign) is optional later: generate a keypair with `npm run tauri signer generate`, put **only the public key** in the repo, and store the private key as GitHub secret `TAURI_SIGNING_PRIVATE_KEY`. Never commit the private key. Until that is wired, Download update saves the GitHub Release installer.
+
+---
+
+## Build installers yourself
+
+Authentic Windows `.exe` / `.msi` and Linux `.deb` / AppImage files have to be produced **on that OS** (or by GitHub Actions). This Mac app does not ship stand-ins.
+
+Node 20+ and Rust are required. The version you get is the version in the clone (`package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`).
+
+```bash
+git clone https://github.com/Ushangallage2/secretVault.git
+cd secretVault
+npm install
+npm run tauri build
+```
+
+| OS | Typical output under `src-tauri/target/release/bundle/` |
+|----|---------------------------------------------------------|
+| macOS | `dmg/*.dmg` and `macos/Secret Vault.app` |
+| Linux | `deb/*.deb` and `appimage/*.AppImage` |
+| Windows | `nsis/*-setup.exe` and `msi/*.msi` |
+
+Linux also needs WebKitGTK (for example `libwebkit2gtk-4.1-dev` on Ubuntu). Pushing `main` runs the same builds in `.github/workflows/tauri-release.yml` when Actions runners are available.
 
 ---
 

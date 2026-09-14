@@ -1,13 +1,9 @@
-Place this version’s installers here so Secret Vault can hand them to another user from About:
+Place only **real** installers here (never fake .deb/.exe). This Mac app cannot cross-build Linux or Windows.
 
-- Secret-Vault_*_macos.dmg
-- Secret-Vault_*_linux.deb (or .AppImage)
-- Secret-Vault_*_windows.exe
+Typical Tauri outputs after `npm run tauri build` on that OS:
 
-Tauri’s own bundle names are also accepted, for example:
+- macOS: src-tauri/target/release/bundle/dmg/*.dmg
+- Linux: src-tauri/target/release/bundle/deb/*.deb (and appimage/)
+- Windows: src-tauri/target/release/bundle/nsis/*-setup.exe (and msi/)
 
-- Secret Vault_0.2.0_x64.dmg
-- Secret Vault_0.2.0_amd64.deb
-- Secret Vault_0.2.0_x64-setup.exe
-
-Do not commit these binaries. Publish them on the GitHub Release for this version tag (v0.2.0, etc.). About looks in this folder first, then falls back to that release.
+Do not commit these binaries. About looks here first, then GitHub Releases. If a platform is missing, the app tells people to clone the repo and build on that OS.

@@ -29,6 +29,20 @@ pub struct InstallerInfo {
     pub source: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateInfo {
+    pub current: String,
+    pub latest: Option<String>,
+    pub pending: bool,
+    pub download_url: Option<String>,
+    pub filename: Option<String>,
+    pub notes: Option<String>,
+    pub html_url: Option<String>,
+    pub status: String,
+    pub error: Option<String>,
+}
+
 pub fn about() -> AppAbout {
     let version = env!("CARGO_PKG_VERSION").to_string();
     AppAbout {
@@ -92,7 +106,12 @@ pub fn list_installers(resource_dir: Option<PathBuf>) -> Vec<InstallerInfo> {
                 label: label.into(),
                 filename,
                 available: false,
-                source: "not published yet — build this platform or attach it to the GitHub release".into(),
+                source: match id {
+                    "linux" => "No real .deb on this copy — build on Linux (or wait for GitHub Actions). Fake installers are not shipped.",
+                    "windows" => "No real .exe on this copy — build on Windows (or wait for GitHub Actions). Fake installers are not shipped.",
+                    _ => "No real macOS .dmg on this copy — run npm run tauri build on a Mac.",
+                }
+                .into(),
             }
         })
         .collect()
@@ -196,9 +215,117 @@ fn match_kind(kind: &str, name: &str) -> bool {
     }
 }
 
+fn current_kind() -> &'static str {
+    if cfg!(target_os = "macos") {
+        "macos"
+    } else if cfg!(target_os = "linux") {
+        "linux"
+    } else {
+        "windows"
+    }
+}
+
+fn strip_v(s: &str) -> &str {
+    s.trim().trim_start_matches(|c: char| c == 'v' || c == 'V')
+}
+
+fn parse_version(s: &str) -> Option<[u64; 3]> {
+    let mut parts = strip_v(s).split(|c: char| c == '.' || c == '-');
+    let mut out = [0u64; 3];
+    for slot in &mut out {
+        let raw = parts.next()?;
+        let digits: String = raw.chars().take_while(|c| c.is_ascii_digit()).collect();
+        if digits.is_empty() {
+            return None;
+        }
+        *slot = digits.parse().ok()?;
+    }
+    Some(out)
+}
+
+fn version_gt(a: &str, b: &str) -> bool {
+    match (parse_version(a), parse_version(b)) {
+        (Some(left), Some(right)) => left > right,
+        _ => false,
+    }
+}
+
+pub fn check_for_update() -> UpdateInfo {
+    let current = env!("CARGO_PKG_VERSION").to_string();
+    match fetch_latest_release() {
+        Err(error) => UpdateInfo {
+            current,
+            latest: None,
+            pending: false,
+            download_url: None,
+            filename: None,
+            notes: None,
+            html_url: None,
+            status: "error".into(),
+            error: Some(error),
+        },
+        Ok(None) => UpdateInfo {
+            current,
+            latest: None,
+            pending: false,
+            download_url: None,
+            filename: None,
+            notes: None,
+            html_url: Some(format!("https://github.com/{GITHUB_REPO}/releases")),
+            status: "noRelease".into(),
+            error: None,
+        },
+        Ok(Some(rel)) => {
+            let latest = strip_v(&rel.tag_name).to_string();
+            let pending = version_gt(&latest, &current);
+            let asset = if pending {
+                match_github(current_kind(), &rel.assets)
+            } else {
+                None
+            };
+            UpdateInfo {
+                current,
+                latest: Some(latest),
+                pending,
+                download_url: asset.map(|a| a.browser_download_url.clone()),
+                filename: asset.map(|a| a.name.clone()),
+                notes: rel.body.filter(|s| !s.trim().is_empty()),
+                html_url: if rel.html_url.is_empty() {
+                    None
+                } else {
+                    Some(rel.html_url)
+                },
+                status: if pending {
+                    "pending".into()
+                } else {
+                    "upToDate".into()
+                },
+                error: None,
+            }
+        }
+    }
+}
+
+pub fn download_pending_update(dest: &Path) -> Result<String, String> {
+    let info = check_for_update();
+    if !info.pending {
+        return Err("No pending update. This copy is already the latest published version.".into());
+    }
+    let url = info
+        .download_url
+        .ok_or_else(|| {
+            format!(
+                "Version {} is published, but no installer for this computer is on the GitHub release yet.",
+                info.latest.unwrap_or_default()
+            )
+        })?;
+    download(&url, dest)?;
+    Ok(format!("Saved {}", dest.display()))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::match_kind;
+    use super::{match_kind, version_gt};
 
     #[test]
     fn matches_tauri_bundle_names() {
@@ -211,6 +338,15 @@ mod tests {
         assert!(!match_kind("macos", "README.txt"));
         assert!(!match_kind("linux", "latest.json"));
     }
+
+    #[test]
+    fn compares_release_versions() {
+        assert!(version_gt("0.3.0", "0.2.0"));
+        assert!(version_gt("v0.2.1", "0.2.0"));
+        assert!(!version_gt("0.2.0", "0.2.0"));
+        assert!(!version_gt("0.2.0", "0.3.0"));
+        assert!(!version_gt("not-a-version", "0.2.0"));
+    }
 }
 
 #[derive(Clone, serde::Deserialize)]
@@ -221,6 +357,12 @@ struct GhAsset {
 
 #[derive(serde::Deserialize)]
 struct GhRelease {
+    #[serde(default)]
+    tag_name: String,
+    #[serde(default)]
+    html_url: String,
+    #[serde(default)]
+    body: Option<String>,
     #[serde(default)]
     assets: Vec<GhAsset>,
 }
@@ -256,6 +398,31 @@ fn github_assets() -> Vec<GhAsset> {
         }
     }
     Vec::new()
+}
+
+fn fetch_latest_release() -> Result<Option<GhRelease>, String> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .user_agent(format!("SecretVault/{}", env!("CARGO_PKG_VERSION")))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let url = format!("https://api.github.com/repos/{GITHUB_REPO}/releases/latest");
+    let resp = client
+        .get(&url)
+        .header("Accept", "application/vnd.github+json")
+        .send()
+        .map_err(|e| format!("Could not reach GitHub Releases: {e}"))?;
+    if resp.status().as_u16() == 404 {
+        return Ok(None);
+    }
+    if !resp.status().is_success() {
+        return Err(format!("GitHub Releases returned {}", resp.status()));
+    }
+    let rel: GhRelease = resp.json().map_err(|e| format!("Bad GitHub release JSON: {e}"))?;
+    if rel.tag_name.trim().is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(rel))
 }
 
 fn preferred_exts(kind: &str) -> &'static [&'static str] {

@@ -33,6 +33,18 @@ export interface InstallerInfo {
   source: string;
 }
 
+export interface UpdateInfo {
+  current: string;
+  latest: string | null;
+  pending: boolean;
+  downloadUrl: string | null;
+  filename: string | null;
+  notes: string | null;
+  htmlUrl: string | null;
+  status: string;
+  error: string | null;
+}
+
 export const api = {
   createVault: (path: string, password: string) =>
     invoke<SessionInfo>("create_vault", { path, password }),
@@ -75,4 +87,6 @@ export const api = {
   listInstallers: () => invoke<InstallerInfo[]>("list_installers"),
   saveInstaller: (kind: string, dest: string) =>
     invoke<string>("save_installer", { kind, dest }),
+  checkForUpdate: () => invoke<UpdateInfo>("check_for_update"),
+  downloadUpdate: (dest: string) => invoke<string>("download_update", { dest }),
 };

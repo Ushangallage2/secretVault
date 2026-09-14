@@ -97,7 +97,13 @@ Auto-push runs after you save, delete, or import entries when that checkbox is o
 
 ### Share this version’s installers
 
-From About, save this version’s macOS `.dmg`, Linux installer, and Windows `.exe` for someone else. Files are taken from `src-tauri/installers/` if you placed them there when building (including real Tauri names such as `Secret Vault_0.2.0_aarch64.dmg`), otherwise from GitHub Releases for the same version tag. GitHub Actions builds those installers on `main` / tag `v0.2.0`.
+From About, save a **real** installer when it exists (bundled `installers/` or the GitHub Release). This Mac copy cannot fabricate Linux `.deb` or Windows `.exe` files. If one is missing, About explains how to **build it on that OS**: clone `https://github.com/Ushangallage2/secretVault`, `npm install`, `npm run tauri build`, then take the file from `src-tauri/target/release/bundle/` (`deb` / `appimage` on Linux, `nsis` / `msi` on Windows, `dmg` on macOS). See README **Build installers yourself**. GitHub Actions can publish those later when runners work.
+
+### Updates
+
+About → **Updates** shows **Current version** (this running app) and checks GitHub Releases. If a newer release exists, it shows **Pending version to download** and **Download update**. A banner appears after unlock when an update is pending. You are not shown a fake pending version when you are already latest.
+
+To publish an update: bump `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml`, then push `main`. Actions attaches installers to GitHub Release `v<version>`.
 
 ### Move to another computer
 

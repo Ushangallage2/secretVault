@@ -1082,21 +1082,75 @@ button.jasper-add {
   display: flex;
   justify-content: space-between;
   gap: 0.75rem;
-  align-items: center;
+  align-items: flex-start;
   padding: 0.7rem 0.8rem;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: rgba(6, 12, 10, 0.4);
 }
 
-.installer-row.unavailable {
-  opacity: 0.72;
+.installer-row.unavailable,
+.installer-row.missing {
+  opacity: 1;
+}
+
+.installer-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.installer-row-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex-shrink: 0;
 }
 
 .about-credit {
   color: var(--muted);
   font-size: 0.9rem;
   margin: 0 0 0.4rem;
+}
+
+.update-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.55rem 1.1rem;
+  border-bottom: 1px solid rgba(240, 195, 90, 0.35);
+  background: rgba(240, 195, 90, 0.1);
+  color: var(--text);
+  font-size: 0.86rem;
+  flex-shrink: 0;
+}
+
+.update-banner-actions {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.update-pending-text {
+  color: #f0c35a;
+  font-size: 0.88rem;
+  margin: 0.15rem 0 0.4rem;
+}
+
+.update-notes {
+  white-space: pre-wrap;
+  max-height: 6rem;
+  overflow: auto;
+}
+
+.update-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.45rem 0 0.2rem;
 }
 
 .about-modal .modal-actions {

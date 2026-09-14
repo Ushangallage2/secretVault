@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { open, save, ask } from "@tauri-apps/plugin-dialog";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { api } from "./api";
+import { api, type UpdateInfo } from "./api";
 import type {
   Entry,
   EntryType,
@@ -34,6 +34,7 @@ export default function App() {
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
   const [importBusy, setImportBusy] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
+  const [update, setUpdate] = useState<UpdateInfo | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rememberUnlock, setRememberUnlock] = useState(
@@ -116,6 +117,14 @@ export default function App() {
     };
   }, [session, resetIdle]);
 
+  useEffect(() => {
+    if (!session) return;
+    void api
+      .checkForUpdate()
+      .then(setUpdate)
+      .catch(() => setUpdate(null));
+  }, [session]);
+
   const onUnlocked = useCallback(
     async (info: SessionInfo, path: string, remember: boolean) => {
       localStorage.setItem(LAST_PATH_KEY, path);
@@ -165,6 +174,21 @@ export default function App() {
   }, [entries, query, filter, tagFilter]);
 
   const selected = entries.find((e) => e.id === selectedId) ?? null;
+
+  const downloadPendingUpdate = async () => {
+    if (!update?.pending) return;
+    const dest = await save({
+      title: "Save pending update",
+      defaultPath: update.filename ?? "Secret-Vault-update.dmg",
+    });
+    if (!dest) return;
+    try {
+      const msg = await api.downloadUpdate(dest);
+      showToast(msg);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : String(err));
+    }
+  };
 
   const copy = async (text: string, label: string, entryId?: string) => {
     if (!text) return;
@@ -379,6 +403,28 @@ export default function App() {
             {filtered.length} / {entries.length}
           </div>
         </header>
+        {update?.pending && (
+          <div className="update-banner">
+            <span>
+              Current version <strong>v{update.current}</strong>
+              {" · "}
+              Pending update <strong>v{update.latest}</strong>
+            </span>
+            <div className="update-banner-actions">
+              <button type="button" className="ghost" onClick={() => setShowAbout(true)}>
+                Details
+              </button>
+              <button
+                type="button"
+                className="primary"
+                disabled={!update.downloadUrl}
+                onClick={() => void downloadPendingUpdate()}
+              >
+                Download update
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="content-split">
           <EntryList
