@@ -116,13 +116,13 @@ About can save installers that match this version for another person:
 - Linux installer (`.deb` / AppImage)
 - Windows `.exe`
 
-Place built files in `src-tauri/installers/` before bundling (Tauri names such as `Secret Vault_0.2.0_aarch64.dmg` are recognized), or attach them to the GitHub Release for this version (`v0.2.0`, etc.). Pushing `main` runs `.github/workflows/tauri-release.yml` (Linux, Windows, macOS via `tauri-action`). A Mac build will **not** contain fake `.deb` / `.exe` files — if Share shows none, build on that OS (below) or wait for Actions.
+Place built files in `src-tauri/installers/` before bundling (Tauri names such as `Secret Vault_0.2.1_aarch64.dmg` are recognized), or attach them to the GitHub Release for this version (`v0.2.1`, etc.). Pushing `main` runs `.github/workflows/tauri-release.yml` (Linux, Windows, macOS via `tauri-action`). A Mac build will **not** contain fake `.deb` / `.exe` files — if Share shows none, build on that OS (below) or wait for Actions.
 
 ### App updates after you push
 
 Installed copies do **not** hot-patch from a source push. Publish a new version like this:
 
-1. Bump the same version in `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml` (for example `0.2.0` → `0.2.1`).
+1. Bump the same version in `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml` (for example `0.2.1` → `0.2.2`).
 2. Push `main`. GitHub Actions builds installers and publishes **GitHub Release** `v0.2.1`.
 3. An already-installed app checks `https://api.github.com/repos/Ushangallage2/secretVault/releases/latest` (no `gh` token). If that release is newer, About and a banner show **Current version** vs **Pending version to download**, with **Download update**.
 
