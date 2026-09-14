@@ -136,7 +136,7 @@ export function AboutBackup({ settings, onClose, onToast, onSettings }: Props) {
           <h3 className="about-h">Share this version</h3>
           <p className="muted tiny">
             Give another person the installer that matches this app version — macOS .dmg, Linux installer, and Windows .exe.
-            Files come from this build’s <code>installers/</code> bundle if you placed them there, otherwise GitHub Releases for this version. They appear after you build or publish those artifacts.
+            Files come from this build’s <code>installers/</code> bundle if present, otherwise the GitHub Release for this version.
           </p>
           <div className="installer-list">
             {installers.length === 0 && <p className="muted tiny">Looking up installers…</p>}

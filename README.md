@@ -30,6 +30,7 @@ One master password unlocks everything. Export is just a copy of the encrypted f
 - Copy to clipboard (clears after ~30s)
 - Auto-lock after idle
 - Optional **Stay signed in** via macOS Keychain (no password on every launch)
+- Sidebar **Log out** locks the session and returns to the unlock screen (stay signed in still applies on the next launch unless you turn it off)
 - **Cloud backup** of the encrypted `.vault` (folder / Google Drive, auto or manual)
 - **About** with version, “developed by Ushan Gallage”, and sharing macOS / Linux / Windows installers
 - Import plain text / scratchpad files with review before save
@@ -115,7 +116,7 @@ About can save installers that match this version for another person:
 - Linux installer (`.deb` / AppImage)
 - Windows `.exe`
 
-Place built files in `src-tauri/installers/` before bundling, or attach them to the GitHub Release for this version (`v0.2.0`, etc.). Until you build or publish those artifacts, Save stays disabled with “not published yet”.
+Place built files in `src-tauri/installers/` before bundling (Tauri names such as `Secret Vault_0.2.0_aarch64.dmg` are recognized), or attach them to the GitHub Release for this version (`v0.2.0`, etc.). Pushing `main` runs `.github/workflows/tauri-release.yml` (Linux, Windows, macOS via `tauri-action`). Until an artifact exists locally or on that release, Save stays disabled.
 
 ---
 

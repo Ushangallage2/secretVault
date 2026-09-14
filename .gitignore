@@ -23,3 +23,7 @@ tsconfig.tsbuildinfo
 # Vault files (never commit secrets)
 *.vault
 *.vault.tmp
+
+# Platform installers live on GitHub Releases, not in git
+src-tauri/installers/*
+!src-tauri/installers/README.txt

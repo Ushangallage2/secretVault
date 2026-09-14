@@ -5,7 +5,7 @@ interface Props {
   onFilter: (f: FilterKind) => void;
   path: string;
   rememberUnlock: boolean;
-  onLock: () => void;
+  onLogout: () => void;
   onLockRequirePassword: () => void;
   onForgetUnlock: () => void;
   onExport: () => void;
@@ -29,7 +29,7 @@ export function Sidebar({
   onFilter,
   path,
   rememberUnlock,
-  onLock,
+  onLogout,
   onLockRequirePassword,
   onForgetUnlock,
   onExport,
@@ -108,14 +108,14 @@ export function Sidebar({
           <button
             type="button"
             className="danger"
-            onClick={onLock}
+            onClick={onLogout}
             title={
               rememberUnlock
-                ? "Lock this session. Next launch can still open automatically."
-                : "Lock this session"
+                ? "Lock this session now. Stay signed in still applies on the next launch."
+                : "Lock this session and return to the unlock screen"
             }
           >
-            Lock
+            Log out
           </button>
           {rememberUnlock && (
             <>

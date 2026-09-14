@@ -153,13 +153,63 @@ fn find_local(dir: &Path, kind: &str) -> Option<PathBuf> {
     matches.pop()
 }
 
+fn is_noise_name(n: &str) -> bool {
+    n.contains("readme")
+        || n.contains("source code")
+        || n.ends_with(".txt")
+        || n.ends_with(".md")
+        || n.ends_with(".sig")
+        || n.ends_with(".blockmap")
+        || n.ends_with(".json")
+        || n.ends_with(".ds_store")
+}
+
 fn match_kind(kind: &str, name: &str) -> bool {
     let n = name.to_lowercase();
+    if is_noise_name(&n) {
+        return false;
+    }
     match kind {
-        "macos" => n.ends_with(".dmg") || n.contains("macos") || n.ends_with(".app.zip"),
-        "linux" => n.ends_with(".deb") || n.ends_with(".appimage") || n.contains("linux"),
-        "windows" => n.ends_with(".exe") || n.ends_with(".msi") || n.contains("windows"),
+        "macos" => {
+            n.ends_with(".dmg")
+                || n.ends_with(".app.tar.gz")
+                || n.ends_with(".app.zip")
+                || n.contains("macos")
+                || n.contains("darwin")
+                || (n.contains("aarch64") && n.ends_with(".dmg"))
+                || (n.contains("universal") && n.ends_with(".dmg"))
+        }
+        "linux" => {
+            n.ends_with(".deb")
+                || n.ends_with(".rpm")
+                || n.ends_with(".appimage")
+                || n.contains("linux")
+        }
+        "windows" => {
+            n.ends_with(".exe")
+                || n.ends_with(".msi")
+                || n.contains("windows")
+                || (n.contains("setup") && (n.ends_with(".exe") || n.ends_with(".msi")))
+                || n.contains("nsis")
+        }
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::match_kind;
+
+    #[test]
+    fn matches_tauri_bundle_names() {
+        assert!(match_kind("macos", "Secret Vault_0.2.0_aarch64.dmg"));
+        assert!(match_kind("macos", "Secret-Vault_0.2.0_macos.dmg"));
+        assert!(match_kind("linux", "secret-vault_0.2.0_amd64.deb"));
+        assert!(match_kind("linux", "secret-vault_0.2.0_amd64.AppImage"));
+        assert!(match_kind("windows", "Secret Vault_0.2.0_x64-setup.exe"));
+        assert!(match_kind("windows", "Secret Vault_0.2.0_x64_en-US.msi"));
+        assert!(!match_kind("macos", "README.txt"));
+        assert!(!match_kind("linux", "latest.json"));
     }
 }
 
@@ -190,7 +240,14 @@ fn github_assets() -> Vec<GhAsset> {
         Err(_) => return Vec::new(),
     };
     for url in urls {
-        if let Ok(resp) = client.get(&url).send() {
+        if let Ok(resp) = client
+            .get(&url)
+            .header("Accept", "application/vnd.github+json")
+            .send()
+        {
+            if !resp.status().is_success() {
+                continue;
+            }
             if let Ok(rel) = resp.json::<GhRelease>() {
                 if !rel.assets.is_empty() {
                     return rel.assets;
@@ -201,7 +258,28 @@ fn github_assets() -> Vec<GhAsset> {
     Vec::new()
 }
 
+fn preferred_exts(kind: &str) -> &'static [&'static str] {
+    match kind {
+        "macos" => &[".dmg", ".app.tar.gz", ".app.zip"],
+        "linux" => &[".deb", ".appimage", ".rpm"],
+        "windows" => &[".exe", ".msi"],
+        _ => &[],
+    }
+}
+
+fn is_sidecar(name: &str) -> bool {
+    is_noise_name(&name.to_lowercase())
+}
+
 fn match_github<'a>(kind: &str, assets: &'a [GhAsset]) -> Option<&'a GhAsset> {
+    for ext in preferred_exts(kind) {
+        if let Some(asset) = assets.iter().find(|a| {
+            let n = a.name.to_lowercase();
+            !is_sidecar(&a.name) && n.ends_with(ext) && match_kind(kind, &a.name)
+        }) {
+            return Some(asset);
+        }
+    }
     assets.iter().find(|a| match_kind(kind, &a.name))
 }
 

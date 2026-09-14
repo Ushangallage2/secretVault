@@ -321,7 +321,7 @@ export default function App() {
         onFilter={setFilter}
         path={session.path}
         rememberUnlock={rememberUnlock}
-        onLock={() => void lock()}
+        onLogout={() => void lock()}
         onLockRequirePassword={() => void lockRequirePassword()}
         onForgetUnlock={() => void forgetUnlock()}
         onExport={() => void handleExport()}

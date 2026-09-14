@@ -4,4 +4,10 @@ Place this version’s installers here so Secret Vault can hand them to another 
 - Secret-Vault_*_linux.deb (or .AppImage)
 - Secret-Vault_*_windows.exe
 
-These files appear after you build each platform (`npm run tauri build`) or attach them to the GitHub Release for this version. If this folder is empty, the app tries GitHub Releases (same version tag) instead.
+Tauri’s own bundle names are also accepted, for example:
+
+- Secret Vault_0.2.0_x64.dmg
+- Secret Vault_0.2.0_amd64.deb
+- Secret Vault_0.2.0_x64-setup.exe
+
+Do not commit these binaries. Publish them on the GitHub Release for this version tag (v0.2.0, etc.). About looks in this folder first, then falls back to that release.

@@ -52,7 +52,8 @@ Tag entries when editing. Filter from the toolbar tag dropdown. Star important i
 macOS **Keychain** is the system password locker (Safari, Wi‑Fi, etc.). Secret Vault can store unlock material there so the next launch opens automatically.
 
 - Enable: check **Stay signed in on this Mac** when unlocking
-- Disable: **Turn off stay signed in** or **Lock & require password**
+- **Log out** (sidebar) locks now and returns to the unlock screen; it does not hide, even when stay signed in is on
+- Disable stay signed in: **Turn off stay signed in** or **Lock & require password**
 - Trade-off: convenient, but anyone using your Mac login can open the vault
 
 ---
@@ -96,7 +97,7 @@ Auto-push runs after you save, delete, or import entries when that checkbox is o
 
 ### Share this version’s installers
 
-From About, save this version’s macOS `.dmg`, Linux installer, and Windows `.exe` for someone else. Files are taken from `src-tauri/installers/` if you placed them there when building, otherwise from GitHub Releases for the same version tag. They appear only after you build or publish those artifacts.
+From About, save this version’s macOS `.dmg`, Linux installer, and Windows `.exe` for someone else. Files are taken from `src-tauri/installers/` if you placed them there when building (including real Tauri names such as `Secret Vault_0.2.0_aarch64.dmg`), otherwise from GitHub Releases for the same version tag. GitHub Actions builds those installers on `main` / tag `v0.2.0`.
 
 ### Move to another computer
 
