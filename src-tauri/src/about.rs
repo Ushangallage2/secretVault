@@ -1,0 +1,228 @@
+//! App identity and installer files for this version (macOS / Linux / Windows).
+
+use serde::Serialize;
+use std::fs;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+
+pub const DEVELOPER: &str = "Ushan Gallage";
+pub const GITHUB_REPO: &str = "Ushangallage2/secretVault";
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppAbout {
+    pub name: String,
+    pub version: String,
+    pub developer: String,
+    pub repo_url: String,
+    pub releases_url: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InstallerInfo {
+    pub id: String,
+    pub label: String,
+    pub filename: String,
+    pub available: bool,
+    pub source: String,
+}
+
+pub fn about() -> AppAbout {
+    let version = env!("CARGO_PKG_VERSION").to_string();
+    AppAbout {
+        name: "Secret Vault".into(),
+        version: version.clone(),
+        developer: DEVELOPER.into(),
+        repo_url: format!("https://github.com/{GITHUB_REPO}"),
+        releases_url: format!("https://github.com/{GITHUB_REPO}/releases/tag/v{version}"),
+    }
+}
+
+pub fn list_installers(resource_dir: Option<PathBuf>) -> Vec<InstallerInfo> {
+    let dirs = search_dirs(resource_dir);
+    let version = env!("CARGO_PKG_VERSION");
+    let specs = [
+        (
+            "macos",
+            "macOS (.dmg)",
+            format!("Secret-Vault_{version}_macos.dmg"),
+        ),
+        (
+            "linux",
+            "Linux installer (.deb / AppImage)",
+            format!("Secret-Vault_{version}_linux.deb"),
+        ),
+        (
+            "windows",
+            "Windows (.exe)",
+            format!("Secret-Vault_{version}_windows.exe"),
+        ),
+    ];
+
+    let github = github_assets();
+
+    specs
+        .into_iter()
+        .map(|(id, label, filename)| {
+            if let Some(local) = find_local_in(&dirs, id) {
+                return InstallerInfo {
+                    id: id.into(),
+                    label: label.into(),
+                    filename: local
+                        .file_name()
+                        .map(|s| s.to_string_lossy().into_owned())
+                        .unwrap_or(filename),
+                    available: true,
+                    source: format!("bundled: {}", local.display()),
+                };
+            }
+            if let Some(asset) = match_github(id, &github) {
+                return InstallerInfo {
+                    id: id.into(),
+                    label: label.into(),
+                    filename: asset.name.clone(),
+                    available: true,
+                    source: "GitHub Releases".into(),
+                };
+            }
+            InstallerInfo {
+                id: id.into(),
+                label: label.into(),
+                filename,
+                available: false,
+                source: "not published yet — build this platform or attach it to the GitHub release".into(),
+            }
+        })
+        .collect()
+}
+
+pub fn save_installer(resource_dir: Option<PathBuf>, kind: &str, dest: &Path) -> Result<String, String> {
+    let dirs = search_dirs(resource_dir);
+    if let Some(local) = find_local_in(&dirs, kind) {
+        fs::copy(&local, dest).map_err(|e| format!("copy installer: {e}"))?;
+        return Ok(format!("Saved {}", dest.display()));
+    }
+    let assets = github_assets();
+    let asset = match_github(kind, &assets)
+        .ok_or_else(|| {
+            format!(
+                "No {kind} installer for v{} yet. Publish it on GitHub Releases: https://github.com/{GITHUB_REPO}/releases",
+                env!("CARGO_PKG_VERSION")
+            )
+        })?;
+    download(&asset.browser_download_url, dest)?;
+    Ok(format!("Downloaded {}", dest.display()))
+}
+
+fn search_dirs(resource_dir: Option<PathBuf>) -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+    if let Some(d) = resource_dir {
+        dirs.push(d.join("installers"));
+        dirs.push(d);
+    }
+    dirs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("installers"));
+    dirs.push(PathBuf::from("installers"));
+    dirs.push(PathBuf::from("src-tauri/installers"));
+    dirs
+}
+
+fn find_local_in(dirs: &[PathBuf], kind: &str) -> Option<PathBuf> {
+    for dir in dirs {
+        if let Some(found) = find_local(dir, kind) {
+            return Some(found);
+        }
+    }
+    None
+}
+
+fn find_local(dir: &Path, kind: &str) -> Option<PathBuf> {
+    let entries = fs::read_dir(dir).ok()?;
+    let mut matches: Vec<PathBuf> = entries
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.is_file())
+        .filter(|p| {
+            p.file_name()
+                .map(|n| match_kind(kind, &n.to_string_lossy()))
+                .unwrap_or(false)
+        })
+        .collect();
+    matches.sort();
+    matches.pop()
+}
+
+fn match_kind(kind: &str, name: &str) -> bool {
+    let n = name.to_lowercase();
+    match kind {
+        "macos" => n.ends_with(".dmg") || n.contains("macos") || n.ends_with(".app.zip"),
+        "linux" => n.ends_with(".deb") || n.ends_with(".appimage") || n.contains("linux"),
+        "windows" => n.ends_with(".exe") || n.ends_with(".msi") || n.contains("windows"),
+        _ => false,
+    }
+}
+
+#[derive(Clone, serde::Deserialize)]
+struct GhAsset {
+    name: String,
+    browser_download_url: String,
+}
+
+#[derive(serde::Deserialize)]
+struct GhRelease {
+    #[serde(default)]
+    assets: Vec<GhAsset>,
+}
+
+fn github_assets() -> Vec<GhAsset> {
+    let version = env!("CARGO_PKG_VERSION");
+    let urls = [
+        format!("https://api.github.com/repos/{GITHUB_REPO}/releases/tags/v{version}"),
+        format!("https://api.github.com/repos/{GITHUB_REPO}/releases/latest"),
+    ];
+    let client = match reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .user_agent("SecretVault/0.2")
+        .build()
+    {
+        Ok(c) => c,
+        Err(_) => return Vec::new(),
+    };
+    for url in urls {
+        if let Ok(resp) = client.get(&url).send() {
+            if let Ok(rel) = resp.json::<GhRelease>() {
+                if !rel.assets.is_empty() {
+                    return rel.assets;
+                }
+            }
+        }
+    }
+    Vec::new()
+}
+
+fn match_github<'a>(kind: &str, assets: &'a [GhAsset]) -> Option<&'a GhAsset> {
+    assets.iter().find(|a| match_kind(kind, &a.name))
+}
+
+fn download(url: &str, dest: &Path) -> Result<(), String> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(180))
+        .user_agent("SecretVault/0.2")
+        .build()
+        .map_err(|e| e.to_string())?;
+    let bytes = client
+        .get(url)
+        .send()
+        .map_err(|e| e.to_string())?
+        .error_for_status()
+        .map_err(|e| e.to_string())?
+        .bytes()
+        .map_err(|e| e.to_string())?;
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let mut f = fs::File::create(dest).map_err(|e| e.to_string())?;
+    f.write_all(&bytes).map_err(|e| e.to_string())?;
+    Ok(())
+}

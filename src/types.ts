@@ -22,6 +22,10 @@ export interface Entry {
 
 export interface VaultSettings {
   autoLockMinutes: number;
+  autoBackup: boolean;
+  backupFolder: string;
+  driveFolderUrl: string;
+  driveClientId: string;
 }
 
 export interface VaultData {

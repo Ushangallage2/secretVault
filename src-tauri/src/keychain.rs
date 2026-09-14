@@ -63,6 +63,64 @@ pub fn clear_unlock(path: &str) -> Result<(), String> {
     }
 }
 
+const DRIVE_ACCOUNT: &str = "google-drive-refresh";
+const DRIVE_SECRET_ACCOUNT: &str = "google-drive-client-secret";
+
+fn drive_entry(account: &str) -> Result<Entry, String> {
+    Entry::new(SERVICE, account).map_err(|e| format!("Keychain entry: {e}"))
+}
+
+pub fn store_drive_refresh(token: &str) -> Result<(), String> {
+    drive_entry(DRIVE_ACCOUNT)?
+        .set_password(token)
+        .map_err(|e| format!("Could not save Google Drive token: {e}"))
+}
+
+pub fn load_drive_refresh() -> Result<String, String> {
+    drive_entry(DRIVE_ACCOUNT)?
+        .get_password()
+        .map_err(|e| format!("Google Drive is not connected: {e}"))
+}
+
+pub fn has_drive_refresh() -> bool {
+    drive_entry(DRIVE_ACCOUNT)
+        .ok()
+        .and_then(|e| e.get_password().ok())
+        .is_some()
+}
+
+pub fn clear_drive_refresh() -> Result<(), String> {
+    match drive_entry(DRIVE_ACCOUNT)?.delete_credential() {
+        Ok(()) => Ok(()),
+        Err(keyring::Error::NoEntry) => Ok(()),
+        Err(e) => Err(format!("Could not clear Google Drive token: {e}")),
+    }
+}
+
+pub fn store_drive_client_secret(secret: &str) -> Result<(), String> {
+    if secret.trim().is_empty() {
+        return clear_drive_client_secret();
+    }
+    drive_entry(DRIVE_SECRET_ACCOUNT)?
+        .set_password(secret.trim())
+        .map_err(|e| format!("Could not save Drive client secret: {e}"))
+}
+
+pub fn load_drive_client_secret() -> Option<String> {
+    drive_entry(DRIVE_SECRET_ACCOUNT)
+        .ok()
+        .and_then(|e| e.get_password().ok())
+        .filter(|s| !s.is_empty())
+}
+
+pub fn clear_drive_client_secret() -> Result<(), String> {
+    match drive_entry(DRIVE_SECRET_ACCOUNT)?.delete_credential() {
+        Ok(()) => Ok(()),
+        Err(keyring::Error::NoEntry) => Ok(()),
+        Err(e) => Err(format!("Could not clear Drive client secret: {e}")),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::account_for;

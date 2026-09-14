@@ -10,6 +10,7 @@ interface Props {
   onForgetUnlock: () => void;
   onExport: () => void;
   onImport: () => void;
+  onAbout: () => void;
   onNew: (type: EntryType) => void;
 }
 
@@ -33,6 +34,7 @@ export function Sidebar({
   onForgetUnlock,
   onExport,
   onImport,
+  onAbout,
   onNew,
 }: Props) {
   const short = path.split("/").pop() ?? path;
@@ -97,6 +99,9 @@ export function Sidebar({
               Stay signed in
             </div>
           )}
+          <button type="button" className="ghost" onClick={onAbout}>
+            About & backup
+          </button>
           <button type="button" className="ghost" onClick={onExport}>
             Export file
           </button>

@@ -75,14 +75,37 @@ Always review before confirming; heuristics are helpful, not perfect.
 
 ---
 
-## Backup & move to another Mac
+## Backup & About
+
+Sidebar → **About & backup** shows the app **version** and **developed by Ushan Gallage**.
+
+### Folder copy and Google Drive
+
+The backup is always the encrypted `.vault` file (safe to store in the cloud). OAuth refresh tokens are **not** written into that file; they live in the OS Keychain.
+
+Use one or both:
+
+- **Backup folder** — any directory, including a **Google Drive for Desktop** sync folder. **Push vault now** (or auto-push after save) copies the vault file there.
+- **Google Drive on the internet** — OAuth Desktop client from Google Cloud Console:
+  1. Create an OAuth client type **Desktop app** and enable the Drive API
+  2. Redirect URI: `http://127.0.0.1:17843`
+  3. Paste client ID (+ client secret if issued) → **Connect Google Drive**
+  4. Paste a Drive folder URL or id
+
+Auto-push runs after you save, delete, or import entries when that checkbox is on.
+
+### Share this version’s installers
+
+From About, save this version’s macOS `.dmg`, Linux installer, and Windows `.exe` for someone else. Files are taken from `src-tauri/installers/` if you placed them there when building, otherwise from GitHub Releases for the same version tag. They appear only after you build or publish those artifacts.
+
+### Move to another computer
 
 1. Quit Secret Vault (vault should be locked / closed)  
-2. Copy `your-file.vault` to the other machine  
-3. Install or build Secret Vault there  
+2. Copy `your-file.vault` (or restore it from the backup folder / Drive) to the other machine  
+3. Install this version (or save an installer from About)  
 4. Unlock with the **same** master password  
 
-“Stay signed in” does **not** travel with the file — re-enable on the new Mac if you want it.
+“Stay signed in” does **not** travel with the file — re-enable on the new machine if you want it.
 
 ---
 

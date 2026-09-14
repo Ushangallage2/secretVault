@@ -11,6 +11,28 @@ import type {
   VaultSettings,
 } from "./types";
 
+export interface AppAbout {
+  name: string;
+  version: string;
+  developer: string;
+  repoUrl: string;
+  releasesUrl: string;
+}
+
+export interface BackupStatus {
+  driveConnected: boolean;
+  lastOk: string | null;
+  lastError: string | null;
+}
+
+export interface InstallerInfo {
+  id: string;
+  label: string;
+  filename: string;
+  available: boolean;
+  source: string;
+}
+
 export const api = {
   createVault: (path: string, password: string) =>
     invoke<SessionInfo>("create_vault", { path, password }),
@@ -42,4 +64,15 @@ export const api = {
     invoke<FileAttachment>("read_file_attachment", { path }),
   exportEntryFile: (id: string, dest: string) =>
     invoke<void>("export_entry_file", { id, dest }),
+  getAppAbout: () => invoke<AppAbout>("get_app_about"),
+  getBackupStatus: () => invoke<BackupStatus>("get_backup_status"),
+  pushVaultBackup: () => invoke<string>("push_vault_backup"),
+  connectGoogleDrive: (clientId: string, clientSecret: string) =>
+    invoke<string>("connect_google_drive", { clientId, clientSecret }),
+  disconnectGoogleDrive: () => invoke<void>("disconnect_google_drive"),
+  storeDriveClientSecret: (secret: string) =>
+    invoke<void>("store_drive_client_secret", { secret }),
+  listInstallers: () => invoke<InstallerInfo[]>("list_installers"),
+  saveInstaller: (kind: string, dest: string) =>
+    invoke<string>("save_installer", { kind, dest }),
 };

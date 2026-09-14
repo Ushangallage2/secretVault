@@ -1,6 +1,6 @@
 [package]
 name = "secret-vault"
-version = "0.1.0"
+version = "0.2.0"
 description = "Encrypted local vault for secrets, commands, and notes"
 authors = ["Ushan Gallage"]
 edition = "2021"
@@ -33,6 +33,9 @@ regex = "1"
 # apple-native is required on macOS — without it keyring v3 uses an in-memory mock
 # store, so "stay signed in" appears to work until the next app launch.
 keyring = { version = "3", features = ["apple-native"] }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "multipart", "rustls-tls"] }
+sha2 = "0.10"
+urlencoding = "2"
 
 [profile.release]
 panic = "abort"

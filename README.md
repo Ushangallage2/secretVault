@@ -30,6 +30,8 @@ One master password unlocks everything. Export is just a copy of the encrypted f
 - Copy to clipboard (clears after ~30s)
 - Auto-lock after idle
 - Optional **Stay signed in** via macOS Keychain (no password on every launch)
+- **Cloud backup** of the encrypted `.vault` (folder / Google Drive, auto or manual)
+- **About** with version, “developed by Ushan Gallage”, and sharing macOS / Linux / Windows installers
 - Import plain text / scratchpad files with review before save
 - Export Jasper / other attached files back to disk
 - Glassy dark UI
@@ -82,6 +84,38 @@ The app bundle appears under:
 4. Add secrets / commands / notes, or use **Import files…**
 
 On another computer: install/build the app → **Unlock** → open the same `.vault` file → enter the same master password.
+
+---
+
+## Backup & About
+
+Sidebar → **About & backup**. The screen shows this app **version** and **developed by Ushan Gallage**.
+
+### Encrypted internet / folder backup
+
+Only the encrypted `.vault` file is copied — never the master password. Google OAuth **refresh tokens stay in the OS Keychain**, not inside the vault.
+
+You can use either destination, or both:
+
+1. **Local / Drive Desktop folder** — Choose a folder on disk. A **Google Drive for Desktop** path (for example `~/Library/CloudStorage/GoogleDrive-…/My Drive/SecretVault`) works: the file is copied there and Drive syncs it to the internet.
+2. **Google Drive upload** — Connect an OAuth **Desktop** client so the app can upload even when Drive Desktop is not installed:
+   - [Google Cloud Console](https://console.cloud.google.com/apis/credentials) → create an OAuth client of type **Desktop app**
+   - Enable the **Google Drive API**
+   - Authorized redirect URI: `http://127.0.0.1:17843`
+   - Paste the client ID (and client secret if Google issued one) in About & backup, then **Connect Google Drive**
+   - Paste a Drive **folder URL** (or folder id)
+
+**Push vault now** copies immediately. Turn on **Automatically push after each save** to copy after you save, delete, or import entries.
+
+### Sharing this version’s installers
+
+About can save installers that match this version for another person:
+
+- macOS `.dmg`
+- Linux installer (`.deb` / AppImage)
+- Windows `.exe`
+
+Place built files in `src-tauri/installers/` before bundling, or attach them to the GitHub Release for this version (`v0.2.0`, etc.). Until you build or publish those artifacts, Save stays disabled with “not published yet”.
 
 ---
 

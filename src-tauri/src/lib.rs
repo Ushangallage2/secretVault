@@ -1,20 +1,25 @@
+mod about;
+mod backup;
 mod importer;
 mod keychain;
 mod vault;
 
+use about::{AppAbout, InstallerInfo};
+use backup::BackupStatus;
 use importer::{drafts_to_entries, preview_paths, ImportDraft, ImportPreview};
 use base64::Engine;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tauri::State;
+use tauri::{AppHandle, Manager, State};
 use vault::{
     Entry, EntryType, OpenVault, VaultData, VaultError, VaultSettings, MAX_ATTACHMENT_BYTES,
 };
 
 struct AppState {
     vault: Mutex<Option<OpenVault>>,
+    backup: Mutex<BackupStatus>,
 }
 
 impl AppState {
@@ -31,6 +36,44 @@ impl AppState {
         let guard = self.vault.lock();
         let v = guard.as_ref().ok_or_else(|| VaultError::Locked.to_string())?;
         f(v).map_err(|e| e.to_string())
+    }
+}
+
+fn installer_dir(app: &AppHandle) -> Option<PathBuf> {
+    app.path()
+        .resolve("installers", tauri::path::BaseDirectory::Resource)
+        .ok()
+}
+
+fn try_auto_backup(state: &Arc<AppState>) {
+    let (path, settings) = {
+        let guard = state.vault.lock();
+        let Some(v) = guard.as_ref() else { return };
+        if !v.data.settings.auto_backup {
+            return;
+        }
+        (v.path().to_path_buf(), v.data.settings.clone())
+    };
+    if !backup::destinations_configured(&settings) {
+        return;
+    }
+    let state = Arc::clone(state);
+    std::thread::spawn(move || {
+        record_backup(&state, backup::push_vault(&path, &settings));
+    });
+}
+
+fn record_backup(state: &AppState, result: Result<String, String>) {
+    let mut status = state.backup.lock();
+    status.drive_connected = keychain::has_drive_refresh();
+    match result {
+        Ok(msg) => {
+            status.last_ok = Some(msg);
+            status.last_error = None;
+        }
+        Err(err) => {
+            status.last_error = Some(err);
+        }
     }
 }
 
@@ -190,7 +233,7 @@ fn list_entries(state: State<'_, Arc<AppState>>) -> Result<Vec<Entry>, String> {
 
 #[tauri::command]
 fn upsert_entry(state: State<'_, Arc<AppState>>, payload: UpsertPayload) -> Result<Entry, String> {
-    state.with_vault_mut(|v| {
+    let saved = state.with_vault_mut(|v| {
         let now = chrono::Utc::now();
         let mut entry = Entry {
             id: payload.id.unwrap_or_default(),
@@ -261,7 +304,9 @@ fn upsert_entry(state: State<'_, Arc<AppState>>, payload: UpsertPayload) -> Resu
         }
 
         v.upsert_entry(entry)
-    })
+    })?;
+    try_auto_backup(state.inner());
+    Ok(saved)
 }
 
 fn validate_attachment(entry: &Entry) -> Result<(), VaultError> {
@@ -389,7 +434,9 @@ fn mime_for_ext(ext: &str) -> String {
 
 #[tauri::command]
 fn delete_entry(state: State<'_, Arc<AppState>>, id: String) -> Result<(), String> {
-    state.with_vault_mut(|v| v.delete_entry(&id))
+    state.with_vault_mut(|v| v.delete_entry(&id))?;
+    try_auto_backup(state.inner());
+    Ok(())
 }
 
 #[tauri::command]
@@ -406,7 +453,9 @@ fn update_settings(
         v.data.settings = settings.clone();
         v.save()?;
         Ok(settings)
-    })
+    })?;
+    try_auto_backup(state.inner());
+    state.with_vault(|v| Ok(v.data.settings.clone()))
 }
 
 #[tauri::command]
@@ -416,7 +465,9 @@ fn export_vault(state: State<'_, Arc<AppState>>, dest: String) -> Result<(), Str
 
 #[tauri::command]
 fn save_vault(state: State<'_, Arc<AppState>>) -> Result<(), String> {
-    state.with_vault_mut(|v| v.save())
+    state.with_vault_mut(|v| v.save())?;
+    try_auto_backup(state.inner());
+    Ok(())
 }
 
 #[tauri::command]
@@ -436,13 +487,15 @@ fn commit_import(
         return Err("Nothing to import".into());
     }
     let entries = drafts_to_entries(drafts);
-    state.with_vault_mut(|v| {
+    let result = state.with_vault_mut(|v| {
         let imported = v.import_entries(entries)?;
         Ok(ImportResult {
             imported,
             entry_count: v.data.entries.len(),
         })
-    })
+    })?;
+    try_auto_backup(state.inner());
+    Ok(result)
 }
 
 #[tauri::command]
@@ -454,10 +507,95 @@ fn default_import_paths() -> Vec<String> {
     ]
 }
 
+#[tauri::command]
+fn get_app_about() -> AppAbout {
+    about::about()
+}
+
+#[tauri::command]
+fn get_backup_status(state: State<'_, Arc<AppState>>) -> BackupStatus {
+    let mut status = state.backup.lock().clone();
+    status.drive_connected = keychain::has_drive_refresh();
+    status
+}
+
+#[tauri::command]
+async fn push_vault_backup(state: State<'_, Arc<AppState>>) -> Result<String, String> {
+    let (path, settings) =
+        state.with_vault(|v| Ok((v.path().to_path_buf(), v.data.settings.clone())))?;
+    let state = Arc::clone(state.inner());
+    tauri::async_runtime::spawn_blocking(move || {
+        let result = backup::push_vault(&path, &settings);
+        record_backup(&state, result.clone());
+        result
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn connect_google_drive(
+    state: State<'_, Arc<AppState>>,
+    client_id: String,
+    client_secret: String,
+) -> Result<String, String> {
+    let persist_id = client_id.trim().to_string();
+    let msg = tauri::async_runtime::spawn_blocking(move || {
+        backup::connect_drive(&client_id, &client_secret)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    {
+        let mut status = state.backup.lock();
+        status.drive_connected = keychain::has_drive_refresh();
+        status.last_error = None;
+    }
+    if !persist_id.is_empty() {
+        let _ = state.with_vault_mut(|v| {
+            v.data.settings.drive_client_id = persist_id;
+            v.save()?;
+            Ok(())
+        });
+    }
+    Ok(msg)
+}
+
+#[tauri::command]
+fn disconnect_google_drive(state: State<'_, Arc<AppState>>) -> Result<(), String> {
+    backup::disconnect_drive()?;
+    let mut status = state.backup.lock();
+    status.drive_connected = false;
+    Ok(())
+}
+
+#[tauri::command]
+fn store_drive_client_secret(secret: String) -> Result<(), String> {
+    keychain::store_drive_client_secret(&secret)
+}
+
+#[tauri::command]
+async fn list_installers(app: AppHandle) -> Vec<InstallerInfo> {
+    let dir = installer_dir(&app);
+    tauri::async_runtime::spawn_blocking(move || about::list_installers(dir))
+        .await
+        .unwrap_or_default()
+}
+
+#[tauri::command]
+async fn save_installer(app: AppHandle, kind: String, dest: String) -> Result<String, String> {
+    let dir = installer_dir(&app);
+    tauri::async_runtime::spawn_blocking(move || {
+        about::save_installer(dir, &kind, Path::new(&dest))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let state = Arc::new(AppState {
         vault: Mutex::new(None),
+        backup: Mutex::new(BackupStatus::default()),
     });
 
     tauri::Builder::default()
@@ -488,6 +626,14 @@ pub fn run() {
             default_import_paths,
             read_file_attachment,
             export_entry_file,
+            get_app_about,
+            get_backup_status,
+            push_vault_backup,
+            connect_google_drive,
+            disconnect_google_drive,
+            store_drive_client_secret,
+            list_installers,
+            save_installer,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Secret Vault");

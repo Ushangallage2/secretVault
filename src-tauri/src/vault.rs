@@ -98,12 +98,27 @@ pub struct Entry {
 #[serde(rename_all = "camelCase")]
 pub struct VaultSettings {
     pub auto_lock_minutes: u32,
+    /// Copy the encrypted .vault into this folder after each save (Drive Desktop, iCloud, USB, …).
+    #[serde(default)]
+    pub auto_backup: bool,
+    #[serde(default)]
+    pub backup_folder: String,
+    /// Google Drive folder URL or folder id for internet upload.
+    #[serde(default)]
+    pub drive_folder_url: String,
+    /// OAuth Desktop client id from Google Cloud Console (stored in the encrypted vault).
+    #[serde(default)]
+    pub drive_client_id: String,
 }
 
 impl Default for VaultSettings {
     fn default() -> Self {
         Self {
             auto_lock_minutes: 10,
+            auto_backup: false,
+            backup_folder: String::new(),
+            drive_folder_url: String::new(),
+            drive_client_id: String::new(),
         }
     }
 }

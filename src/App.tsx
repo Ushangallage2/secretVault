@@ -17,6 +17,7 @@ import { EntryList } from "./components/EntryList";
 import { EntryDetail } from "./components/EntryDetail";
 import { EntryEditor } from "./components/EntryEditor";
 import { ImportReview } from "./components/ImportReview";
+import { AboutBackup } from "./components/AboutBackup";
 
 const LAST_PATH_KEY = "secret-vault-last-path";
 const REMEMBER_KEY = "secret-vault-remember-unlock";
@@ -32,6 +33,7 @@ export default function App() {
   const [editing, setEditing] = useState<Entry | null | "new">(null);
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
   const [importBusy, setImportBusy] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rememberUnlock, setRememberUnlock] = useState(
@@ -324,6 +326,7 @@ export default function App() {
         onForgetUnlock={() => void forgetUnlock()}
         onExport={() => void handleExport()}
         onImport={() => void handleImport()}
+        onAbout={() => setShowAbout(true)}
         onNew={(type: EntryType) =>
           setEditing({
             id: "",
@@ -399,6 +402,24 @@ export default function App() {
           initial={editing === "new" ? null : editing}
           onClose={() => setEditing(null)}
           onSave={handleSave}
+        />
+      )}
+
+      {showAbout && session && (
+        <AboutBackup
+          settings={session.settings}
+          onClose={() => setShowAbout(false)}
+          onToast={showToast}
+          onSettings={async (s) => {
+            const next = await api.updateSettings({
+              autoLockMinutes: s.autoLockMinutes,
+              autoBackup: s.autoBackup,
+              backupFolder: s.backupFolder,
+              driveFolderUrl: s.driveFolderUrl,
+              driveClientId: s.driveClientId,
+            });
+            setSession({ ...session, settings: next });
+          }}
         />
       )}
 
