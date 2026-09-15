@@ -157,6 +157,10 @@ struct UpsertPayload {
     file_content: String,
     #[serde(default)]
     byte_size: u64,
+    #[serde(default)]
+    due_at: Option<chrono::DateTime<chrono::Utc>>,
+    #[serde(default)]
+    todo_done: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -291,6 +295,8 @@ fn upsert_entry(
             updated_at: now,
             last_used_at: None,
             deleted_at: None,
+            due_at: payload.due_at,
+            todo_done: payload.todo_done,
         };
         if entry.title.is_empty() {
             return Err(VaultError::msg("title is required"));

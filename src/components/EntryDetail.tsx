@@ -10,6 +10,7 @@ interface Props {
   trashed?: boolean;
   onCopy: (text: string, label: string, entryId?: string) => void;
   onToggleFavorite: () => void;
+  onToggleTodoDone?: () => void;
   onExportFile?: (entry: Entry) => void;
 }
 
@@ -29,6 +30,7 @@ export function EntryDetail({
   trashed = false,
   onCopy,
   onToggleFavorite,
+  onToggleTodoDone,
   onExportFile,
 }: Props) {
   const [reveal, setReveal] = useState(false);
@@ -59,6 +61,11 @@ export function EntryDetail({
           <button type="button" className="ghost" onClick={onToggleFavorite}>
             {entry.favorite ? "Unfavorite" : "Favorite"}
           </button>
+          {entry.type === "todo" && onToggleTodoDone && (
+            <button type="button" className="ghost" onClick={onToggleTodoDone}>
+              {entry.todoDone ? "Mark not done" : "Mark done"}
+            </button>
+          )}
           {isFileType && onExportFile && (
             <button type="button" className="primary" onClick={() => onExportFile(entry)}>
               {entry.type === "jasper" ? "Export Jasper…" : "Save file…"}
@@ -131,6 +138,20 @@ export function EntryDetail({
         </div>
       )}
 
+      {entry.type === "todo" && (
+        <div className="fields">
+          <Field
+            label="Due"
+            value={
+              entry.dueAt
+                ? new Date(entry.dueAt).toLocaleString()
+                : "No reminder time"
+            }
+          />
+          <Field label="Status" value={entry.todoDone ? "Done" : "Open"} />
+        </div>
+      )}
+
       {isFileType && (
         <div className="fields">
           <Field label="File name" value={entry.fileName || "—"} onCopy={entry.fileName ? () => onCopy(entry.fileName, "filename", entry.id) : undefined} />
@@ -167,10 +188,10 @@ export function EntryDetail({
         </div>
       )}
 
-      {(entry.type === "command" || entry.type === "note") && (
+      {(entry.type === "command" || entry.type === "note" || entry.type === "todo") && (
         <div className="field">
           <div className="field-label">
-            {entry.type === "command" ? "Command" : "Body"}
+            {entry.type === "command" ? "Command" : entry.type === "todo" ? "Notes" : "Body"}
             {entry.body && (
               <button
                 type="button"
@@ -187,7 +208,7 @@ export function EntryDetail({
         </div>
       )}
 
-      {entry.username && entry.type !== "secret" && !isFileType && (
+      {entry.username && entry.type !== "secret" && entry.type !== "todo" && !isFileType && (
         <Field
           label="Username / context"
           value={entry.username}

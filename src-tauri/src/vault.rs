@@ -54,6 +54,7 @@ pub enum EntryType {
     Jasper,
     /// Any other attached file stored inside the encrypted vault.
     File,
+    Todo,
 }
 
 /// Soft/hard limits for attachments stored inside the encrypted JSON vault.
@@ -95,6 +96,11 @@ pub struct Entry {
     /// Soft-deleted entries stay in the vault until restored or purged.
     #[serde(default)]
     pub deleted_at: Option<DateTime<Utc>>,
+    /// Optional due time for todo entries (ISO-8601).
+    #[serde(default)]
+    pub due_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub todo_done: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

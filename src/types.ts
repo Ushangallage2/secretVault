@@ -1,4 +1,4 @@
-export type EntryType = "secret" | "command" | "note" | "jasper" | "file";
+export type EntryType = "secret" | "command" | "note" | "jasper" | "file" | "todo";
 
 export interface Entry {
   id: string;
@@ -19,6 +19,8 @@ export interface Entry {
   updatedAt: string;
   lastUsedAt: string | null;
   deletedAt?: string | null;
+  dueAt?: string | null;
+  todoDone?: boolean;
 }
 
 export interface VaultSettings {
@@ -55,6 +57,8 @@ export interface UpsertPayload {
   mimeType?: string;
   fileContent?: string;
   byteSize?: number;
+  dueAt?: string | null;
+  todoDone?: boolean;
 }
 
 export type FilterKind =
@@ -64,6 +68,7 @@ export type FilterKind =
   | "note"
   | "jasper"
   | "file"
+  | "todo"
   | "favorite"
   | "trash";
 

@@ -13,6 +13,7 @@ interface Props {
   onExport: () => void;
   onImport: () => void;
   onAbout: () => void;
+  onScratch: () => void;
   onNew: (type: EntryType) => void;
 }
 
@@ -24,6 +25,7 @@ const FILTERS: { id: FilterKind; label: string }[] = [
   { id: "note", label: "Notes" },
   { id: "jasper", label: "Jaspers" },
   { id: "file", label: "Files" },
+  { id: "todo", label: "Todos" },
   { id: "trash", label: "Trash" },
 ];
 
@@ -39,6 +41,7 @@ export function Sidebar({
   onExport,
   onImport,
   onAbout,
+  onScratch,
   onNew,
 }: Props) {
   const short = path.split("/").pop() ?? path;
@@ -84,6 +87,9 @@ export function Sidebar({
               <button type="button" className="ghost" onClick={() => onNew("note")}>
                 + Note
               </button>
+              <button type="button" className="ghost" onClick={() => onNew("todo")}>
+                + Todo
+              </button>
               <button type="button" className="ghost jasper-add" onClick={() => onNew("jasper")}>
                 + Jasper
               </button>
@@ -109,6 +115,9 @@ export function Sidebar({
             )}
             <button type="button" className="ghost" onClick={onAbout}>
               About & backup
+            </button>
+            <button type="button" className="ghost" onClick={() => void onScratch()}>
+              Scratch pad
             </button>
             <button type="button" className="ghost" onClick={onExport}>
               Export file

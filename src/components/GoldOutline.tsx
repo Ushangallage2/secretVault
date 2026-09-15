@@ -1,104 +1,93 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
-function rimPath(w: number, h: number, inset: number, r: number): string {
-  const x = inset;
-  const y = inset;
-  const width = Math.max(1, w - inset * 2);
-  const height = Math.max(1, h - inset * 2);
-  const rr = Math.min(r, width / 2, height / 2);
-  if (rr <= 0.01) {
-    return `M ${x} ${y} H ${x + width} V ${y + height} H ${x} Z`;
-  }
-  return [
-    `M ${x + rr} ${y}`,
-    `H ${x + width - rr}`,
-    `A ${rr} ${rr} 0 0 1 ${x + width} ${y + rr}`,
-    `V ${y + height - rr}`,
-    `A ${rr} ${rr} 0 0 1 ${x + width - rr} ${y + height}`,
-    `H ${x + rr}`,
-    `A ${rr} ${rr} 0 0 1 ${x} ${y + height - rr}`,
-    `V ${y + rr}`,
-    `A ${rr} ${rr} 0 0 1 ${x + rr} ${y}`,
-    "Z",
-  ].join(" ");
+function pointOnRect(dist: number, w: number, h: number, inset: number) {
+  const rw = Math.max(1, w - inset * 2);
+  const rh = Math.max(1, h - inset * 2);
+  const peri = 2 * (rw + rh);
+  let p = dist % peri;
+  if (p < 0) p += peri;
+  const x0 = inset;
+  const y0 = inset;
+  if (p < rw) return { x: x0 + p, y: y0 };
+  p -= rw;
+  if (p < rh) return { x: x0 + rw, y: y0 + p };
+  p -= rh;
+  if (p < rw) return { x: x0 + rw - p, y: y0 + rh };
+  p -= rw;
+  return { x: x0, y: y0 + rh - p };
 }
 
-/** Soft horizon light that rides the outer window rim. */
+/** Bright tip with a fading tail, drawn on canvas so the UI stays smooth. */
 export function GoldOutline() {
   const wrapRef = useRef<HTMLDivElement>(null);
-  const [box, setBox] = useState({ w: 0, h: 0 });
-  const uid = useId().replace(/:/g, "");
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return;
-    const apply = () => {
-      const r = el.getBoundingClientRect();
-      setBox({ w: Math.max(1, Math.round(r.width)), h: Math.max(1, Math.round(r.height)) });
-    };
-    apply();
-    const ro = new ResizeObserver(apply);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+    const wrap = wrapRef.current;
+    const canvas = canvasRef.current;
+    if (!wrap || !canvas) return;
+    const ctx = canvas.getContext("2d", { alpha: true, desynchronized: true });
+    if (!ctx) return;
 
-  const { w, h } = box;
-  const band = 16;
-  const d = w > 0 && h > 0 ? rimPath(w, h, 1, 0) : "";
+    let w = 1;
+    let h = 1;
+    let raf = 0;
+    let last = 0;
+    const start = performance.now();
+    const fpsGap = 1000 / 24;
+
+    const resize = () => {
+      const r = wrap.getBoundingClientRect();
+      w = Math.max(1, Math.floor(r.width));
+      h = Math.max(1, Math.floor(r.height));
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.25);
+      canvas.width = Math.floor(w * dpr);
+      canvas.height = Math.floor(h * dpr);
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+
+    const draw = (now: number) => {
+      raf = window.requestAnimationFrame(draw);
+      if (now - last < fpsGap) return;
+      last = now;
+      const peri = 2 * (Math.max(1, w - 3) + Math.max(1, h - 3));
+      const t = ((now - start) % 52_000) / 52_000;
+      const head = t * peri;
+      const tail = peri * 0.08;
+      ctx.clearRect(0, 0, w, h);
+      const steps = 22;
+      for (let i = steps; i >= 0; i--) {
+        const u = i / steps;
+        const pos = pointOnRect(head - u * tail, w, h, 1.5);
+        const fade = (1 - u) ** 2.1;
+        const radius = 0.7 + fade * 2.2;
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(255, ${Math.round(198 + fade * 42)}, ${Math.round(110 + fade * 90)}, ${0.04 + fade * 0.7})`;
+        ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      const tip = pointOnRect(head, w, h, 1.5);
+      ctx.beginPath();
+      ctx.fillStyle = "rgba(255, 250, 232, 0.95)";
+      ctx.arc(tip.x, tip.y, 2.15, 0, Math.PI * 2);
+      ctx.fill();
+    };
+
+    resize();
+    const ro = new ResizeObserver(resize);
+    ro.observe(wrap);
+    raf = window.requestAnimationFrame(draw);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      ro.disconnect();
+    };
+  }, []);
 
   return (
     <div ref={wrapRef} className="gold-outline" aria-hidden>
-      {d && (
-        <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
-          <defs>
-            <mask id={`gold-rim-${uid}`} maskUnits="userSpaceOnUse">
-              <rect x="0" y="0" width={w} height={h} fill="white" />
-              <rect
-                x={band}
-                y={band}
-                width={Math.max(1, w - band * 2)}
-                height={Math.max(1, h - band * 2)}
-                fill="black"
-              />
-            </mask>
-            <filter
-              id={`gold-haze-${uid}`}
-              x="-50%"
-              y="-50%"
-              width="200%"
-              height="200%"
-              colorInterpolationFilters="sRGB"
-            >
-              <feGaussianBlur stdDeviation="6" />
-            </filter>
-            <filter
-              id={`gold-soft-${uid}`}
-              x="-50%"
-              y="-50%"
-              width="200%"
-              height="200%"
-              colorInterpolationFilters="sRGB"
-            >
-              <feGaussianBlur stdDeviation="2.4" />
-            </filter>
-          </defs>
-          <g mask={`url(#gold-rim-${uid})`}>
-            <path
-              className="gold-beam gold-beam-wash"
-              d={d}
-              pathLength={1000}
-              filter={`url(#gold-haze-${uid})`}
-            />
-            <path
-              className="gold-beam gold-beam-glow"
-              d={d}
-              pathLength={1000}
-              filter={`url(#gold-soft-${uid})`}
-            />
-            <path className="gold-beam gold-beam-core" d={d} pathLength={1000} />
-          </g>
-        </svg>
-      )}
+      <canvas ref={canvasRef} />
     </div>
   );
 }

@@ -22,6 +22,8 @@ import { AboutBackup } from "./components/AboutBackup";
 import { UpdateOffer } from "./components/UpdateOffer";
 import { CommandPalette } from "./components/CommandPalette";
 import { GoldOutline } from "./components/GoldOutline";
+import { holdInScratch, todoFiredKey, writeTodoAlert } from "./scratch";
+import { openScratchPad, openTodoAlert } from "./windows";
 
 const LAST_PATH_KEY = "secret-vault-last-path";
 const REMEMBER_KEY = "secret-vault-remember-unlock";
@@ -114,15 +116,19 @@ export default function App() {
 
   useEffect(() => {
     if (!session) return;
-    const onActivity = () => resetIdle();
+    let last = 0;
+    const onActivity = () => {
+      const now = Date.now();
+      if (now - last < 1500) return;
+      last = now;
+      resetIdle();
+    };
     window.addEventListener("keydown", onActivity);
-    window.addEventListener("mousemove", onActivity);
-    window.addEventListener("click", onActivity);
+    window.addEventListener("pointerdown", onActivity);
     resetIdle();
     return () => {
       window.removeEventListener("keydown", onActivity);
-      window.removeEventListener("mousemove", onActivity);
-      window.removeEventListener("click", onActivity);
+      window.removeEventListener("pointerdown", onActivity);
       if (idleTimer.current) window.clearTimeout(idleTimer.current);
     };
   }, [session, resetIdle]);
@@ -152,6 +158,29 @@ export default function App() {
       unlisten?.();
     };
   }, [session]);
+
+  useEffect(() => {
+    if (!session) return;
+    const check = () => {
+      const now = Date.now();
+      for (const entry of entries) {
+        if (entry.type !== "todo" || entry.todoDone || !entry.dueAt) continue;
+        const due = new Date(entry.dueAt).getTime();
+        if (Number.isNaN(due) || due > now) continue;
+        const fired = todoFiredKey(entry.id, entry.dueAt);
+        if (localStorage.getItem(fired)) continue;
+        localStorage.setItem(fired, "1");
+        writeTodoAlert({ id: entry.id, title: entry.title, dueAt: entry.dueAt });
+        void openTodoAlert().catch(() => {
+          showToast(`Todo due: ${entry.title}`, 6000);
+        });
+        break;
+      }
+    };
+    check();
+    const id = window.setInterval(check, 20_000);
+    return () => window.clearInterval(id);
+  }, [session, entries]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -195,6 +224,7 @@ export default function App() {
           if (filter === "note" && e.type !== "note") return false;
           if (filter === "jasper" && e.type !== "jasper") return false;
           if (filter === "file" && e.type !== "file") return false;
+          if (filter === "todo" && e.type !== "todo") return false;
         }
         if (tagFilter && !e.tags.includes(tagFilter)) return false;
         if (!q) return true;
@@ -223,11 +253,9 @@ export default function App() {
   const copy = async (text: string, label: string, entryId?: string) => {
     if (!text) return;
     await writeText(text);
-    showToast(`Copied ${label}`);
-    if (entryId) {
-      await api.touchEntry(entryId);
-      await refresh();
-    }
+    holdInScratch(text);
+    showToast(`Copied ${label} · held in scratch pad`);
+    if (entryId) void api.touchEntry(entryId);
     window.setTimeout(async () => {
       try {
         await writeText("");
@@ -300,6 +328,29 @@ export default function App() {
       mimeType: entry.mimeType,
       fileContent: entry.fileContent,
       byteSize: entry.byteSize,
+      dueAt: entry.dueAt ?? null,
+      todoDone: entry.todoDone ?? false,
+    });
+    await refresh();
+  };
+
+  const toggleTodoDone = async (entry: Entry) => {
+    await api.upsertEntry({
+      id: entry.id,
+      type: entry.type,
+      title: entry.title,
+      username: entry.username,
+      password: entry.password,
+      body: entry.body,
+      url: entry.url,
+      tags: entry.tags,
+      favorite: entry.favorite,
+      fileName: entry.fileName,
+      mimeType: entry.mimeType,
+      fileContent: entry.fileContent,
+      byteSize: entry.byteSize,
+      dueAt: entry.dueAt ?? null,
+      todoDone: !entry.todoDone,
     });
     await refresh();
   };
@@ -409,6 +460,11 @@ export default function App() {
         onExport={() => void handleExport()}
         onImport={() => void handleImport()}
         onAbout={() => setShowAbout(true)}
+        onScratch={() => {
+          void openScratchPad().catch((err) =>
+            showToast(err instanceof Error ? err.message : String(err)),
+          );
+        }}
         onNew={(type: EntryType) =>
           setEditing({
             id: "",
@@ -427,6 +483,8 @@ export default function App() {
             createdAt: "",
             updatedAt: "",
             lastUsedAt: null,
+            dueAt: null,
+            todoDone: false,
           })
         }
       />
@@ -500,6 +558,7 @@ export default function App() {
             onPurge={() => selected && void handlePurge(selected.id)}
             onCopy={copy}
             onToggleFavorite={() => selected && void toggleFavorite(selected)}
+            onToggleTodoDone={() => selected && selected.type === "todo" && void toggleTodoDone(selected)}
             onExportFile={(e) => void handleExportAttached(e)}
           />
         </div>

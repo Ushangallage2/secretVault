@@ -15,6 +15,21 @@ function formatBytes(n: number): string {
   return `${(n / (1024 * 1024)).toFixed(2)} MB`;
 }
 
+function toLocalInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function fromLocalInput(value: string): string | null {
+  if (!value.trim()) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString();
+}
+
 export function EntryEditor({ initial, onClose, onSave }: Props) {
   const isNew = !initial?.id;
   const [type, setType] = useState<EntryType>(initial?.type ?? "secret");
@@ -29,6 +44,8 @@ export function EntryEditor({ initial, onClose, onSave }: Props) {
   const [mimeType, setMimeType] = useState(initial?.mimeType ?? "");
   const [fileContent, setFileContent] = useState(initial?.fileContent ?? "");
   const [byteSize, setByteSize] = useState(initial?.byteSize ?? 0);
+  const [dueAt, setDueAt] = useState(() => toLocalInput(initial?.dueAt));
+  const [todoDone, setTodoDone] = useState(initial?.todoDone ?? false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -101,6 +118,8 @@ export function EntryEditor({ initial, onClose, onSave }: Props) {
         mimeType,
         fileContent,
         byteSize,
+        dueAt: type === "todo" ? fromLocalInput(dueAt) : null,
+        todoDone: type === "todo" ? todoDone : false,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -136,6 +155,7 @@ export function EntryEditor({ initial, onClose, onSave }: Props) {
               <option value="secret">Secret</option>
               <option value="command">Command</option>
               <option value="note">Note</option>
+              <option value="todo">Todo</option>
               <option value="jasper">Jasper file</option>
               <option value="file">Other file</option>
             </select>
@@ -163,6 +183,30 @@ export function EntryEditor({ initial, onClose, onSave }: Props) {
               <label>
                 URL
                 <input value={url} onChange={(e) => setUrl(e.target.value)} />
+              </label>
+            </>
+          )}
+
+          {type === "todo" && (
+            <>
+              <label>
+                Due time (optional)
+                <input
+                  type="datetime-local"
+                  value={dueAt}
+                  onChange={(e) => setDueAt(e.target.value)}
+                />
+              </label>
+              <p className="hint" style={{ marginTop: "-0.45rem" }}>
+                If you set a time, a small reminder window pops up when it’s due.
+              </p>
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={todoDone}
+                  onChange={(e) => setTodoDone(e.target.checked)}
+                />
+                Mark done
               </label>
             </>
           )}
@@ -216,7 +260,7 @@ export function EntryEditor({ initial, onClose, onSave }: Props) {
 
           {!isFileType && (
             <label>
-              {type === "command" ? "Command / snippet" : "Notes / body"}
+              {type === "command" ? "Command / snippet" : type === "todo" ? "Notes" : "Notes / body"}
               <textarea
                 rows={type === "command" ? 8 : 5}
                 value={body}
@@ -226,7 +270,7 @@ export function EntryEditor({ initial, onClose, onSave }: Props) {
             </label>
           )}
 
-          {type !== "secret" && !isFileType && (
+          {type !== "secret" && type !== "todo" && !isFileType && (
             <label>
               Username / context (optional)
               <input value={username} onChange={(e) => setUsername(e.target.value)} />

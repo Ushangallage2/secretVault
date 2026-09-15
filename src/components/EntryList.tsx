@@ -32,6 +32,17 @@ export function EntryList({ entries, selectedId, onSelect }: Props) {
           <span className="entry-sub">
             {e.type === "secret"
               ? e.username || "—"
+              : e.type === "todo"
+                ? e.todoDone
+                  ? "Done"
+                  : e.dueAt
+                    ? new Date(e.dueAt).toLocaleString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })
+                    : "No time set"
               : e.type === "jasper" || e.type === "file"
                 ? e.fileName || e.tags.slice(0, 3).map((t) => `#${t}`).join(" ") || "—"
                 : e.tags.slice(0, 3).map((t) => `#${t}`).join(" ") || "—"}

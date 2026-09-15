@@ -23,13 +23,13 @@
   --note: #c4b0e8;
   --jasper: #ff9f6b;
   --file: #8fd4c1;
+  --todo: #9ad4a6;
   --radius: 12px;
   --radius-lg: 20px;
   --shadow:
-    0 28px 72px rgba(0, 0, 0, 0.48),
-    0 0 0 1px rgba(232, 196, 110, 0.16),
-    0 0 48px rgba(201, 162, 62, 0.12);
-  --blur: 28px;
+    0 18px 40px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(232, 196, 110, 0.14);
+  --blur: 10px;
   --font: "Outfit", "Avenir Next", "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", "SF Mono", Menlo, Consolas, monospace;
 }
@@ -249,7 +249,7 @@ code,
     var(--shadow),
     0 0 64px rgba(212, 175, 90, 0.18),
     inset 0 1px 0 rgba(255, 236, 180, 0.12);
-  backdrop-filter: blur(var(--blur)) saturate(1.25);
+  backdrop-filter: blur(var(--blur));
   -webkit-backdrop-filter: blur(var(--blur)) saturate(1.25);
 }
 
@@ -536,8 +536,8 @@ code,
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  backdrop-filter: blur(var(--blur)) saturate(1.22);
-  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.22);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
   box-shadow: inset -1px 0 24px rgba(201, 150, 50, 0.08);
 }
 
@@ -679,8 +679,8 @@ code,
   min-width: 0;
   min-height: 0;
   background: var(--glass);
-  backdrop-filter: blur(var(--blur)) saturate(1.22);
-  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.22);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
 }
 
 .toolbar {
@@ -690,8 +690,8 @@ code,
   padding: 0.9rem 1.1rem;
   border-bottom: 1px solid rgba(232, 196, 110, 0.22);
   background: rgba(28, 20, 10, 0.62);
-  backdrop-filter: blur(var(--blur)) saturate(1.2);
-  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
   flex-shrink: 0;
 }
 
@@ -753,8 +753,8 @@ code,
   overflow: auto;
   padding: 0.55rem;
   background: rgba(18, 12, 6, 0.48);
-  backdrop-filter: blur(var(--blur)) saturate(1.2);
-  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
 }
 
 .entry-list.empty,
@@ -834,6 +834,12 @@ code,
   background: rgba(143, 212, 193, 0.08);
 }
 
+.type-pill.todo {
+  color: var(--todo);
+  border-color: rgba(154, 212, 166, 0.4);
+  background: rgba(154, 212, 166, 0.1);
+}
+
 .file-attach-panel {
   margin-bottom: 0.85rem;
   padding: 0.75rem;
@@ -886,8 +892,8 @@ button.jasper-add {
   overflow: auto;
   padding: 1.25rem 1.4rem 2.25rem;
   background: rgba(22, 16, 8, 0.4);
-  backdrop-filter: blur(var(--blur)) saturate(1.2);
-  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
 }
 
 .detail-head {
@@ -988,8 +994,8 @@ button.jasper-add {
   place-items: center;
   padding: 1.25rem;
   z-index: 40;
-  backdrop-filter: blur(var(--blur)) saturate(1.2);
-  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
   overflow: auto;
 }
 
@@ -1004,8 +1010,8 @@ button.jasper-add {
   border-radius: 18px;
   padding: 0;
   box-shadow: var(--shadow), 0 0 48px rgba(212, 175, 90, 0.12);
-  backdrop-filter: blur(var(--blur)) saturate(1.22);
-  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.22);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
 }
 
 .modal-body {
@@ -1059,8 +1065,8 @@ button.jasper-add {
   font-size: 0.9rem;
   font-weight: 500;
   box-shadow: var(--shadow);
-  backdrop-filter: blur(var(--blur)) saturate(1.22);
-  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.22);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -1268,8 +1274,8 @@ button.jasper-add {
   display: grid;
   place-items: center;
   background: rgba(8, 6, 4, 0.64);
-  backdrop-filter: blur(var(--blur)) saturate(1.2);
-  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
 }
 
 .update-install-card {
@@ -1284,8 +1290,8 @@ button.jasper-add {
   max-width: 22rem;
   text-align: center;
   box-shadow: var(--shadow);
-  backdrop-filter: blur(var(--blur)) saturate(1.22);
-  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.22);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
 }
 
 .update-install-card strong {
@@ -1322,6 +1328,15 @@ button.jasper-add {
   height: 100%;
   display: block;
   overflow: visible;
+}
+
+.gold-outline canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
 }
 
 .gold-beam {
@@ -1439,4 +1454,61 @@ button.jasper-add {
 
 .backup-health-error {
   color: var(--danger);
+}
+
+.pane-window {
+  height: 100%;
+  min-height: 100%;
+  padding: 0.85rem 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  background:
+    radial-gradient(ellipse 70% 40% at 0% 0%, rgba(232, 196, 110, 0.14), transparent 55%),
+    #140e08;
+  color: var(--text);
+}
+
+.pane-window header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.pane-window header span,
+.pane-window .muted {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.scratch-pane textarea {
+  flex: 1;
+  min-height: 140px;
+  resize: none;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.pane-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.pane-note {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--gold-bright);
+}
+
+.alert-pane h1 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.alert-kicker {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.7rem;
+  color: var(--gold);
 }
