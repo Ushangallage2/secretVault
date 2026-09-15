@@ -67,8 +67,7 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
-          uploadUpdaterJson: false
-          uploadUpdaterSignatures: true
+          includeUpdaterJson: false
 
   merge-latest-json:
     name: Rebuild latest.json

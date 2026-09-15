@@ -1047,11 +1047,10 @@ button.jasper-add {
   font-weight: 500;
   box-shadow: var(--shadow);
   backdrop-filter: blur(var(--blur)) saturate(1.22);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.22);
   display: flex;
   align-items: center;
   gap: 0.75rem;
-}
-  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.22);
 }
 
 .import-modal {
