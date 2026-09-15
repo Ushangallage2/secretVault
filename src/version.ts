@@ -1,5 +1,5 @@
 /** Canonical semver. Keep in sync with package.json, Cargo.toml, and tauri.conf.json. */
-export const APP_VERSION = "2.6.0";
+export const APP_VERSION = "2.6.1";
 
 /** 2.5.0 → "2.5"; 2.5.1 stays "2.5.1". */
 export function marketingVersion(raw: string | null | undefined): string {

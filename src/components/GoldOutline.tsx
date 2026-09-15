@@ -1,23 +1,70 @@
 import { useEffect, useRef } from "react";
 
-function pointOnRect(dist: number, w: number, h: number, inset: number) {
-  const rw = Math.max(1, w - inset * 2);
-  const rh = Math.max(1, h - inset * 2);
-  const peri = 2 * (rw + rh);
-  let p = dist % peri;
-  if (p < 0) p += peri;
-  const x0 = inset;
-  const y0 = inset;
-  if (p < rw) return { x: x0 + p, y: y0 };
-  p -= rw;
-  if (p < rh) return { x: x0 + rw, y: y0 + p };
-  p -= rh;
-  if (p < rw) return { x: x0 + rw - p, y: y0 + rh };
-  p -= rw;
-  return { x: x0, y: y0 + rh - p };
+type Rim = {
+  x: number;
+  y: number;
+  rw: number;
+  rh: number;
+  r: number;
+  hs: number;
+  vs: number;
+  arc: number;
+  peri: number;
+};
+
+function rimLayout(w: number, h: number, radius: number, inset: number): Rim {
+  const x = inset;
+  const y = inset;
+  const rw = Math.max(2, w - inset * 2);
+  const rh = Math.max(2, h - inset * 2);
+  const r = Math.max(0, Math.min(radius, rw / 2, rh / 2));
+  const hs = Math.max(0, rw - 2 * r);
+  const vs = Math.max(0, rh - 2 * r);
+  const arc = (Math.PI / 2) * r;
+  return { x, y, rw, rh, r, hs, vs, arc, peri: 2 * hs + 2 * vs + 4 * arc };
 }
 
-/** Bright tip with a fading tail, drawn on canvas so the UI stays smooth. */
+function pointOnRim(L: Rim, dist: number) {
+  let d = ((dist % L.peri) + L.peri) % L.peri;
+  const { x, y, rw, rh, r, hs, vs, arc } = L;
+  if (d <= hs) return { x: x + r + d, y };
+  d -= hs;
+  if (d <= arc) {
+    const a = -Math.PI / 2 + (r ? d / r : 0);
+    return { x: x + rw - r + Math.cos(a) * r, y: y + r + Math.sin(a) * r };
+  }
+  d -= arc;
+  if (d <= vs) return { x: x + rw, y: y + r + d };
+  d -= vs;
+  if (d <= arc) {
+    const a = r ? d / r : 0;
+    return { x: x + rw - r + Math.cos(a) * r, y: y + rh - r + Math.sin(a) * r };
+  }
+  d -= arc;
+  if (d <= hs) return { x: x + rw - r - d, y: y + rh };
+  d -= hs;
+  if (d <= arc) {
+    const a = Math.PI / 2 + (r ? d / r : 0);
+    return { x: x + r + Math.cos(a) * r, y: y + rh - r + Math.sin(a) * r };
+  }
+  d -= arc;
+  if (d <= vs) return { x, y: y + rh - r - d };
+  d -= vs;
+  const a = Math.PI + (r ? d / r : 0);
+  return { x: x + r + Math.cos(a) * r, y: y + r + Math.sin(a) * r };
+}
+
+function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  const rr = Math.max(0, Math.min(r, w / 2, h / 2));
+  ctx.moveTo(x + rr, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr);
+  ctx.closePath();
+}
+
+/** Premium border beam: thin rim light, hot tip, fading tail, outward bloom. */
 export function GoldOutline() {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -33,14 +80,14 @@ export function GoldOutline() {
     let h = 1;
     let raf = 0;
     let last = 0;
-    const start = performance.now();
-    const fpsGap = 1000 / 24;
+    const started = performance.now();
+    const fpsGap = 1000 / 30;
 
     const resize = () => {
-      const r = wrap.getBoundingClientRect();
-      w = Math.max(1, Math.floor(r.width));
-      h = Math.max(1, Math.floor(r.height));
-      const dpr = Math.min(window.devicePixelRatio || 1, 1.25);
+      const box = wrap.getBoundingClientRect();
+      w = Math.max(1, Math.floor(box.width));
+      h = Math.max(1, Math.floor(box.height));
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
       canvas.width = Math.floor(w * dpr);
       canvas.height = Math.floor(h * dpr);
       canvas.style.width = `${w}px`;
@@ -52,27 +99,56 @@ export function GoldOutline() {
       raf = window.requestAnimationFrame(draw);
       if (now - last < fpsGap) return;
       last = now;
-      const peri = 2 * (Math.max(1, w - 3) + Math.max(1, h - 3));
-      const t = ((now - start) % 52_000) / 52_000;
-      const head = t * peri;
-      const tail = peri * 0.08;
+
+      const inset = 2;
+      const radius = 14;
+      const L = rimLayout(w, h, radius, inset);
+      if (L.peri < 8) return;
+
+      const t = ((now - started) % 14_000) / 14_000;
+      const head = t * L.peri;
+      const tailLen = L.peri * 0.16;
+      const steps = 48;
+
       ctx.clearRect(0, 0, w, h);
-      const steps = 22;
-      for (let i = steps; i >= 0; i--) {
-        const u = i / steps;
-        const pos = pointOnRect(head - u * tail, w, h, 1.5);
-        const fade = (1 - u) ** 2.1;
-        const radius = 0.7 + fade * 2.2;
-        ctx.beginPath();
-        ctx.fillStyle = `rgba(255, ${Math.round(198 + fade * 42)}, ${Math.round(110 + fade * 90)}, ${0.04 + fade * 0.7})`;
-        ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      const tip = pointOnRect(head, w, h, 1.5);
+      ctx.save();
       ctx.beginPath();
-      ctx.fillStyle = "rgba(255, 250, 232, 0.95)";
-      ctx.arc(tip.x, tip.y, 2.15, 0, Math.PI * 2);
+      ctx.rect(0, 0, w, h);
+      roundedRect(ctx, 36, 36, Math.max(1, w - 72), Math.max(1, h - 72), Math.max(0, radius - 4));
+      ctx.clip("evenodd");
+
+      const tip = pointOnRim(L, head);
+      const bloom = 92;
+      const glow = ctx.createRadialGradient(tip.x, tip.y, 0, tip.x, tip.y, bloom);
+      glow.addColorStop(0, "rgba(255, 250, 235, 1)");
+      glow.addColorStop(0.06, "rgba(255, 205, 120, 0.78)");
+      glow.addColorStop(0.18, "rgba(255, 148, 48, 0.36)");
+      glow.addColorStop(0.42, "rgba(220, 84, 16, 0.12)");
+      glow.addColorStop(1, "rgba(0, 0, 0, 0)");
+      ctx.fillStyle = glow;
+      ctx.fillRect(tip.x - bloom, tip.y - bloom, bloom * 2, bloom * 2);
+
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      let prev = tip;
+      for (let i = 1; i <= steps; i++) {
+        const u = i / steps;
+        const pos = pointOnRim(L, head - u * tailLen);
+        const fade = (1 - u) ** 1.7;
+        ctx.beginPath();
+        ctx.moveTo(prev.x, prev.y);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.strokeStyle = `rgba(255, ${Math.round(190 + fade * 50)}, ${Math.round(96 + fade * 90)}, ${0.04 + fade * 0.78})`;
+        ctx.lineWidth = 0.7 + fade * 2.4;
+        ctx.stroke();
+        prev = pos;
+      }
+
+      ctx.beginPath();
+      ctx.fillStyle = "rgba(255, 252, 240, 1)";
+      ctx.arc(tip.x, tip.y, 2.4, 0, Math.PI * 2);
       ctx.fill();
+      ctx.restore();
     };
 
     resize();
