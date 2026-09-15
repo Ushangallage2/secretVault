@@ -1,4 +1,5 @@
 import type { EntryType, FilterKind } from "../types";
+import { versionMark } from "../version";
 
 interface Props {
   filter: FilterKind;
@@ -48,7 +49,9 @@ export function Sidebar({
         <div className="sidebar-top">
           <div className="sidebar-brand">
             <div className="brand-mark sm" />
-            <strong>Secret Vault</strong>
+            <strong>
+              Secret Vault <span className="brand-ver">{versionMark()}</span>
+            </strong>
           </div>
 
           <nav className="nav-block" aria-label="Filters">

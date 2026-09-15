@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, type UpdateInfo } from "../api";
 import type { SessionInfo } from "../types";
 import { UpdateOffer } from "./UpdateOffer";
+import { versionMark } from "../version";
 
 const REMEMBER_KEY = "secret-vault-remember-unlock";
 /** Set when user locks in-app; cleared on cold start so auto-unlock only runs on launch. */
@@ -197,7 +198,7 @@ export function UnlockScreen({
           <div className="brand">
             <div className="brand-mark" aria-hidden />
             <div>
-              <h1>Secret Vault</h1>
+              <h1>Secret Vault {versionMark()}</h1>
               <p>Encrypted secrets & commands · local only</p>
             </div>
           </div>
@@ -241,7 +242,7 @@ export function UnlockScreen({
           <div className="brand">
             <div className="brand-mark" aria-hidden />
             <div>
-              <h1>Secret Vault</h1>
+              <h1>Secret Vault {versionMark()}</h1>
               <p>Encrypted secrets & commands · local only</p>
             </div>
           </div>

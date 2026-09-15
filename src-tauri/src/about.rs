@@ -54,6 +54,24 @@ pub fn about() -> AppAbout {
     }
 }
 
+/// 2.5.0 → "2.5" for the window title and in-app mark.
+pub fn marketing_version(raw: &str) -> String {
+    let v = strip_v(raw);
+    let parts: Vec<&str> = v.split('.').collect();
+    if parts.len() == 3 && parts[2] == "0" {
+        format!("{}.{}", parts[0], parts[1])
+    } else {
+        v.to_string()
+    }
+}
+
+pub fn window_title() -> String {
+    format!(
+        "Secret Vault v{}",
+        marketing_version(env!("CARGO_PKG_VERSION"))
+    )
+}
+
 pub fn list_installers(resource_dir: Option<PathBuf>) -> Vec<InstallerInfo> {
     let dirs = search_dirs(resource_dir);
     let version = env!("CARGO_PKG_VERSION");
@@ -415,8 +433,8 @@ pub fn download_pending_update(dest: &Path) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        match_github_for_arch, match_kind, macos_compat_rank, pick_local, version_gt, CpuFamily,
-        GhAsset,
+        marketing_version, match_github_for_arch, match_kind, macos_compat_rank, pick_local,
+        version_gt, window_title, CpuFamily, GhAsset,
     };
     use std::path::PathBuf;
 
@@ -460,7 +478,16 @@ mod tests {
     }
 
     #[test]
+    fn marketing_version_drops_trailing_zero_patch() {
+        assert_eq!(marketing_version("2.5.0"), "2.5");
+        assert_eq!(marketing_version("v2.5.0"), "2.5");
+        assert_eq!(marketing_version("2.5.1"), "2.5.1");
+        assert_eq!(window_title(), "Secret Vault v2.5");
+    }
+
+    #[test]
     fn compares_release_versions() {
+        assert!(version_gt("2.5.0", "0.2.5"));
         assert!(version_gt("0.3.0", "0.2.0"));
         assert!(version_gt("v0.2.1", "0.2.0"));
         assert!(!version_gt("0.2.0", "0.2.0"));

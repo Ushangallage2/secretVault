@@ -3,6 +3,7 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { api, type AppAbout, type BackupStatus, type InstallerInfo, type UpdateInfo } from "../api";
+import { versionMark } from "../version";
 import { UpdateOffer } from "./UpdateOffer";
 import type { VaultSettings } from "../types";
 
@@ -169,7 +170,8 @@ export function AboutBackup({ settings, onClose, onToast, onSettings }: Props) {
         <div className="modal-body">
           <h3>About this app</h3>
           <p className="about-version">
-            {about?.name ?? "Secret Vault"} <strong>v{about?.version ?? update?.current ?? "…"}</strong>
+            {about?.name ?? "Secret Vault"}{" "}
+            <strong>{versionMark(about?.version ?? update?.current) || "…"}</strong>
           </p>
           <p className="about-credit">developed by {about?.developer ?? "Ushan Gallage"}</p>
 

@@ -44,6 +44,7 @@ body,
 .app {
   margin: 0;
   height: 100%;
+  overflow: hidden;
   font-family: var(--font);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
@@ -583,10 +584,22 @@ code,
 }
 
 .sidebar-brand strong {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.38rem;
   color: var(--gold-bright);
   text-shadow:
     0 0 14px rgba(246, 231, 178, 0.55),
     0 0 28px rgba(212, 175, 90, 0.4);
+}
+
+.sidebar-brand .brand-ver {
+  font-weight: 600;
+  font-size: 0.84em;
+  letter-spacing: 0.01em;
+  color: var(--gold);
+  text-shadow: 0 0 12px rgba(246, 231, 178, 0.4);
 }
 
 .nav-block {
@@ -1292,6 +1305,7 @@ button.jasper-add {
   position: relative;
   height: 100%;
   min-height: 0;
+  overflow: hidden;
 }
 
 .gold-outline {
@@ -1299,44 +1313,62 @@ button.jasper-add {
   inset: 0;
   z-index: 40;
   pointer-events: none;
-  overflow: hidden;
 }
 
 .gold-outline svg {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   display: block;
+  overflow: visible;
 }
 
-.gold-outline rect {
+.gold-beam {
   fill: none;
-  stroke: url(#gold-beam-grad);
-  stroke-width: 1.15;
   stroke-linecap: round;
-  stroke-dasharray: 90 910;
-  stroke-dashoffset: 1000;
-  opacity: 0;
-  filter: drop-shadow(0 0 6px rgba(240, 214, 140, 0.85));
+  stroke-linejoin: round;
+  animation: gold-horizon-drift 50s linear infinite;
 }
 
-.gold-outline.run rect {
-  animation: gold-beam-run 2.6s ease-in-out;
+.gold-beam-wash {
+  stroke: rgba(232, 186, 110, 0.38);
+  stroke-width: 14;
+  stroke-dasharray: 110 890;
+  animation:
+    gold-horizon-drift 50s linear infinite,
+    gold-horizon-breathe 16s ease-in-out infinite;
 }
 
-@keyframes gold-beam-run {
-  0% {
-    opacity: 0;
-    stroke-dashoffset: 1000;
-  }
-  12% {
-    opacity: 1;
-  }
-  88% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
+.gold-beam-glow {
+  stroke: rgba(255, 220, 150, 0.62);
+  stroke-width: 6;
+  stroke-dasharray: 70 930;
+}
+
+.gold-beam-core {
+  stroke: #fff1c8;
+  stroke-width: 1.35;
+  stroke-dasharray: 36 964;
+  opacity: 0.88;
+}
+
+@keyframes gold-horizon-drift {
+  from {
     stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -1000;
+  }
+}
+
+@keyframes gold-horizon-breathe {
+  0%,
+  100% {
+    opacity: 0.28;
+  }
+  50% {
+    opacity: 0.48;
   }
 }
 

@@ -3,6 +3,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { api, type UpdateInfo } from "../api";
 import { installUpdateAndRestart } from "../updates";
+import { versionMark } from "../version";
 
 interface Props {
   update: UpdateInfo | null;
@@ -105,7 +106,9 @@ export function UpdateOffer({
   if (variant === "about") {
     let statusText = "Could not check for updates.";
     if (!update) statusText = "Checking GitHub Releases…";
-    else if (update.pending && update.latest) statusText = `Pending version: v${update.latest}`;
+    else if (update.pending && update.latest) {
+      statusText = `Pending version: ${versionMark(update.latest)}`;
+    }
     else if (update.status === "upToDate") statusText = "You’re up to date — no pending update.";
     else if (update.status === "noRelease") {
       statusText =
@@ -116,7 +119,7 @@ export function UpdateOffer({
       <>
         {overlay}
         <p className="muted tiny">
-          Current version: <strong>v{update?.current ?? "…"}</strong>
+          Current version: <strong>{update ? versionMark(update.current) : "…"}</strong>
         </p>
         <p className={pending ? "update-pending-text" : "muted tiny"}>{statusText}</p>
         {update?.notes && <p className="muted tiny update-notes">{update.notes}</p>}
@@ -130,9 +133,9 @@ export function UpdateOffer({
       {overlay}
       <div className={variant === "unlock" ? "update-banner update-banner-unlock" : "update-banner"}>
         <span>
-          Current version <strong>v{update?.current}</strong>
+          Current version <strong>{versionMark(update?.current)}</strong>
           {" · "}
-          Pending update <strong>v{update?.latest}</strong>
+          Pending update <strong>{versionMark(update?.latest)}</strong>
         </span>
         {actions}
       </div>
