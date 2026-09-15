@@ -1097,6 +1097,7 @@ pub fn drafts_to_entries(drafts: Vec<ImportDraft>) -> Vec<Entry> {
             created_at: now,
             updated_at: now,
             last_used_at: None,
+            deleted_at: None,
         })
         .collect()
 }

@@ -1047,6 +1047,10 @@ button.jasper-add {
   font-weight: 500;
   box-shadow: var(--shadow);
   backdrop-filter: blur(var(--blur)) saturate(1.22);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
   -webkit-backdrop-filter: blur(var(--blur)) saturate(1.22);
 }
 
@@ -1283,4 +1287,125 @@ button.jasper-add {
 
 .about-modal .modal-actions {
   flex-wrap: wrap;
+}
+
+.app-root {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+}
+
+.gold-outline {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.gold-outline svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.gold-outline rect {
+  fill: none;
+  stroke: url(#gold-beam-grad);
+  stroke-width: 1.15;
+  stroke-linecap: round;
+  stroke-dasharray: 90 910;
+  stroke-dashoffset: 1000;
+  opacity: 0;
+  filter: drop-shadow(0 0 6px rgba(240, 214, 140, 0.85));
+}
+
+.gold-outline.run rect {
+  animation: gold-beam-run 2.6s ease-in-out;
+}
+
+@keyframes gold-beam-run {
+  0% {
+    opacity: 0;
+    stroke-dashoffset: 1000;
+  }
+  12% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    stroke-dashoffset: 0;
+  }
+}
+
+.palette-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(6, 4, 2, 0.45);
+  display: grid;
+  place-items: start center;
+  padding-top: 12vh;
+}
+
+.palette {
+  width: min(560px, 92vw);
+  background: var(--glass-strong);
+  border: 1px solid rgba(240, 214, 140, 0.4);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 0.75rem;
+  backdrop-filter: blur(var(--blur));
+}
+
+.palette input {
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+.palette ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.palette-hit {
+  width: 100%;
+  display: flex;
+  gap: 0.55rem;
+  align-items: baseline;
+  text-align: left;
+  border: 1px solid transparent;
+  background: transparent;
+}
+
+.palette-hit.active {
+  border-color: var(--line-strong);
+  background: var(--glass-hover);
+}
+
+.palette-hint {
+  margin: 0.45rem 0 0;
+}
+
+.backup-health {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.7rem 0.85rem;
+  background: var(--glass-soft);
+  margin: 0.4rem 0 0.75rem;
+}
+
+.backup-health p {
+  margin: 0.2rem 0;
+  font-size: 0.88rem;
+}
+
+.backup-health-error {
+  color: var(--danger);
 }

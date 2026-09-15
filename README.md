@@ -26,16 +26,18 @@ One master password unlocks everything. Export is just a copy of the encrypted f
 
 - Encrypted vault file (AES-256-GCM + Argon2id)
 - Entry types: Secret · Command · Note · **Jasper** · **File**
-- Search, favorites, type filters, tag dropdown
+- Search, favorites, type filters, tag dropdown, **⌘K** quick search
+- Trash with undo (entries kept 30 days)
+- Change master password (re-encrypts the vault)
 - Copy to clipboard (clears after ~30s)
 - Auto-lock after idle
 - Optional **Stay signed in** via macOS Keychain (no password on every launch)
 - Sidebar **Log out** locks the session and returns to the unlock screen (stay signed in still applies on the next launch unless you turn it off)
-- **Cloud backup** of the encrypted `.vault` (folder / Google Drive, auto or manual)
-- **About** with version, “developed by Ushan Gallage”, sharing installers, and **Install update and restart** (in-place) plus a GitHub download fallback
+- **Cloud backup** of the encrypted `.vault` (folder / Google Drive) with last-success time, Drive connected/disconnected, and a toast if auto-backup fails
+- **About** with version, “developed by Ushan Gallage”, sharing **Intel and Apple Silicon** macOS installers plus Linux/Windows, and **Install update and restart**
 - Import plain text / scratchpad files with review before save
 - Export Jasper / other attached files back to disk
-- Dark luxury gold UI (metallic primary buttons, gold-glow titles — the 0.2.2 look vs 0.2.1’s light champagne accents)
+- Dark gold glass UI with a once-a-minute outline beam
 
 ---
 

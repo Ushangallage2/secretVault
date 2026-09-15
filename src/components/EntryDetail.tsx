@@ -5,6 +5,9 @@ interface Props {
   entry: Entry | null;
   onEdit: () => void;
   onDelete: () => void;
+  onRestore?: () => void;
+  onPurge?: () => void;
+  trashed?: boolean;
   onCopy: (text: string, label: string, entryId?: string) => void;
   onToggleFavorite: () => void;
   onExportFile?: (entry: Entry) => void;
@@ -21,6 +24,9 @@ export function EntryDetail({
   entry,
   onEdit,
   onDelete,
+  onRestore,
+  onPurge,
+  trashed = false,
   onCopy,
   onToggleFavorite,
   onExportFile,
@@ -58,12 +64,25 @@ export function EntryDetail({
               {entry.type === "jasper" ? "Export Jasper…" : "Save file…"}
             </button>
           )}
-          <button type="button" className="ghost" onClick={onEdit}>
-            Edit
-          </button>
-          <button type="button" className="danger" onClick={onDelete}>
-            Delete
-          </button>
+          {trashed ? (
+            <>
+              <button type="button" className="primary" onClick={onRestore}>
+                Restore
+              </button>
+              <button type="button" className="danger" onClick={onPurge}>
+                Delete forever
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="ghost" onClick={onEdit}>
+                Edit
+              </button>
+              <button type="button" className="danger" onClick={onDelete}>
+                Move to trash
+              </button>
+            </>
+          )}
         </div>
       </div>
 

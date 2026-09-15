@@ -18,6 +18,7 @@ export interface Entry {
   createdAt: string;
   updatedAt: string;
   lastUsedAt: string | null;
+  deletedAt?: string | null;
 }
 
 export interface VaultSettings {
@@ -63,7 +64,8 @@ export type FilterKind =
   | "note"
   | "jasper"
   | "file"
-  | "favorite";
+  | "favorite"
+  | "trash";
 
 export interface ImportDraft {
   type: EntryType;

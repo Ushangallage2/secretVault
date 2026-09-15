@@ -1,6 +1,6 @@
 [package]
 name = "secret-vault"
-version = "0.2.4"
+version = "0.2.5"
 description = "Encrypted local vault for secrets, commands, and notes"
 authors = ["Ushan Gallage"]
 edition = "2021"

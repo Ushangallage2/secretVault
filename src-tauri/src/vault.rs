@@ -92,6 +92,9 @@ pub struct Entry {
     pub updated_at: DateTime<Utc>,
     #[serde(default)]
     pub last_used_at: Option<DateTime<Utc>>,
+    /// Soft-deleted entries stay in the vault until restored or purged.
+    #[serde(default)]
+    pub deleted_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -272,6 +275,83 @@ impl OpenVault {
         self.persist_with_salt(&salt)
     }
 
+    pub fn change_password(&mut self, current: &str, new: &str) -> Result<(), VaultError> {
+        if new.len() < 8 {
+            return Err(VaultError::msg(
+                "new master password must be at least 8 characters",
+            ));
+        }
+        let bytes = fs::read(&self.path)?;
+        let (salt, nonce, ciphertext) = unpack_file(&bytes)?;
+        let check = derive_key(current, salt)?;
+        if check.0 != self.key.0 {
+            return Err(VaultError::WrongPassword);
+        }
+        let _ = decrypt(&check, nonce, ciphertext)?;
+        let mut new_salt = [0u8; SALT_LEN];
+        OsRng.fill_bytes(&mut new_salt);
+        self.key = derive_key(new, &new_salt)?;
+        self.persist_with_salt(&new_salt)?;
+        Ok(())
+    }
+
+    pub fn active_entries(&self) -> impl Iterator<Item = &Entry> {
+        self.data.entries.iter().filter(|e| e.deleted_at.is_none())
+    }
+
+    pub fn trashed_entries(&self) -> impl Iterator<Item = &Entry> {
+        self.data.entries.iter().filter(|e| e.deleted_at.is_some())
+    }
+
+    pub fn restore_entry(&mut self, id: &str) -> Result<Entry, VaultError> {
+        let now = Utc::now();
+        let entry = self
+            .data
+            .entries
+            .iter_mut()
+            .find(|e| e.id == id)
+            .ok_or_else(|| VaultError::msg("entry not found"))?;
+        entry.deleted_at = None;
+        entry.updated_at = now;
+        let out = entry.clone();
+        self.save()?;
+        Ok(out)
+    }
+
+    pub fn purge_entry(&mut self, id: &str) -> Result<(), VaultError> {
+        let before = self.data.entries.len();
+        self.data.entries.retain(|e| e.id != id);
+        if self.data.entries.len() == before {
+            return Err(VaultError::msg("entry not found"));
+        }
+        self.save()?;
+        Ok(())
+    }
+
+    pub fn empty_trash(&mut self) -> Result<usize, VaultError> {
+        let before = self.data.entries.len();
+        self.data.entries.retain(|e| e.deleted_at.is_none());
+        let n = before - self.data.entries.len();
+        if n > 0 {
+            self.save()?;
+        }
+        Ok(n)
+    }
+
+    pub fn purge_expired_trash(&mut self) -> Result<usize, VaultError> {
+        let cutoff = Utc::now() - chrono::Duration::days(30);
+        let before = self.data.entries.len();
+        self.data.entries.retain(|e| match e.deleted_at {
+            Some(t) => t > cutoff,
+            None => true,
+        });
+        let n = before - self.data.entries.len();
+        if n > 0 {
+            self.save()?;
+        }
+        Ok(n)
+    }
+
     pub fn path(&self) -> &Path {
         &self.path
     }
@@ -315,11 +395,18 @@ impl OpenVault {
     }
 
     pub fn delete_entry(&mut self, id: &str) -> Result<(), VaultError> {
-        let before = self.data.entries.len();
-        self.data.entries.retain(|e| e.id != id);
-        if self.data.entries.len() == before {
-            return Err(VaultError::msg("entry not found"));
+        let now = Utc::now();
+        let entry = self
+            .data
+            .entries
+            .iter_mut()
+            .find(|e| e.id == id)
+            .ok_or_else(|| VaultError::msg("entry not found"))?;
+        if entry.deleted_at.is_some() {
+            return Ok(());
         }
+        entry.deleted_at = Some(now);
+        entry.updated_at = now;
         self.save()?;
         Ok(())
     }

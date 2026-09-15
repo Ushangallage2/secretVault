@@ -59,9 +59,14 @@ pub fn list_installers(resource_dir: Option<PathBuf>) -> Vec<InstallerInfo> {
     let version = env!("CARGO_PKG_VERSION");
     let specs = [
         (
-            "macos",
-            "macOS (.dmg)",
-            format!("Secret-Vault_{version}_macos.dmg"),
+            "macos-intel",
+            "macOS Intel (.dmg)",
+            format!("Secret.Vault_{version}_x64.dmg"),
+        ),
+        (
+            "macos-arm",
+            "macOS Apple Silicon (.dmg)",
+            format!("Secret.Vault_{version}_aarch64.dmg"),
         ),
         (
             "linux",
@@ -109,6 +114,8 @@ pub fn list_installers(resource_dir: Option<PathBuf>) -> Vec<InstallerInfo> {
                 source: match id {
                     "linux" => "No real .deb on this copy — build on Linux (or wait for GitHub Actions). Fake installers are not shipped.",
                     "windows" => "No real .exe on this copy — build on Windows (or wait for GitHub Actions). Fake installers are not shipped.",
+                    "macos-intel" => "Intel Mac .dmg is published on GitHub Releases after Actions finishes (Secret.Vault_*_x64.dmg).",
+                    "macos-arm" => "Apple Silicon .dmg is published on GitHub Releases after Actions finishes (Secret.Vault_*_aarch64.dmg).",
                     _ => "No real macOS .dmg on this copy — run npm run tauri build on a Mac.",
                 }
                 .into(),
@@ -168,12 +175,17 @@ fn find_local(dir: &Path, kind: &str) -> Option<PathBuf> {
                 .unwrap_or(false)
         })
         .collect();
-    pick_local(kind, matches, host_cpu())
+    let cpu = match kind {
+        "macos-intel" => CpuFamily::Intel,
+        "macos-arm" => CpuFamily::AppleSilicon,
+        _ => host_cpu(),
+    };
+    pick_local(kind, matches, cpu)
 }
 
 fn pick_local(kind: &str, matches: Vec<PathBuf>, cpu: CpuFamily) -> Option<PathBuf> {
-    if kind == "macos" {
-        for ext in preferred_exts(kind) {
+    if kind == "macos" || kind == "macos-intel" || kind == "macos-arm" {
+        for ext in preferred_exts("macos") {
             let mut ranked: Vec<(u8, PathBuf)> = matches
                 .iter()
                 .filter_map(|p| {
@@ -213,7 +225,7 @@ fn match_kind(kind: &str, name: &str) -> bool {
         return false;
     }
     match kind {
-        "macos" => {
+        "macos" | "macos-intel" | "macos-arm" => {
             n.ends_with(".dmg")
                 || n.ends_with(".app.tar.gz")
                 || n.ends_with(".app.zip")
@@ -473,6 +485,15 @@ mod tests {
     }
 
     #[test]
+    fn share_rows_split_intel_and_apple_silicon() {
+        let list = v021_release_assets();
+        let intel = match_github_for_arch("macos-intel", &list, CpuFamily::Other).unwrap();
+        let arm = match_github_for_arch("macos-arm", &list, CpuFamily::Other).unwrap();
+        assert_eq!(intel.name, "Secret.Vault_0.2.1_x64.dmg");
+        assert_eq!(arm.name, "Secret.Vault_0.2.1_aarch64.dmg");
+    }
+
+    #[test]
     fn intel_mac_prefers_x86_64_dmg_over_aarch64() {
         let list = assets(&[
             "Secret.Vault_0.2.2_aarch64.dmg",
@@ -612,7 +633,7 @@ fn fetch_latest_release() -> Result<Option<GhRelease>, String> {
 
 fn preferred_exts(kind: &str) -> &'static [&'static str] {
     match kind {
-        "macos" => &[".dmg", ".app.tar.gz", ".app.zip"],
+        "macos" | "macos-intel" | "macos-arm" => &[".dmg", ".app.tar.gz", ".app.zip"],
         "linux" => &[".deb", ".appimage", ".rpm"],
         "windows" => &[".exe", ".msi"],
         _ => &[],
@@ -637,8 +658,14 @@ fn match_github_for_arch<'a>(
         .filter(|a| !is_sidecar(&a.name) && match_kind(kind, &a.name))
         .collect();
 
-    if kind == "macos" {
-        for ext in preferred_exts(kind) {
+    let cpu = match kind {
+        "macos-intel" => CpuFamily::Intel,
+        "macos-arm" => CpuFamily::AppleSilicon,
+        _ => cpu,
+    };
+
+    if kind == "macos" || kind == "macos-intel" || kind == "macos-arm" {
+        for ext in preferred_exts("macos") {
             let mut ranked: Vec<(u8, &'a GhAsset)> = candidates
                 .iter()
                 .copied()

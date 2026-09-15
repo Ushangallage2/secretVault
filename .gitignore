@@ -23,6 +23,7 @@ tsconfig.tsbuildinfo
 # Vault files (never commit secrets)
 *.vault
 *.vault.tmp
+*.backup-status.json
 
 # Tauri updater private key — pubkey only lives in tauri.conf.json
 secret-vault.key

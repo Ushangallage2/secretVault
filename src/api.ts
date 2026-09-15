@@ -21,7 +21,9 @@ export interface AppAbout {
 
 export interface BackupStatus {
   driveConnected: boolean;
+  driveWanted: boolean;
   lastOk: string | null;
+  lastDetail: string | null;
   lastError: string | null;
 }
 
@@ -61,8 +63,14 @@ export const api = {
   getSession: () => invoke<SessionInfo>("get_session"),
   getVaultData: () => invoke<VaultData>("get_vault_data"),
   listEntries: () => invoke<Entry[]>("list_entries"),
+  listTrashed: () => invoke<Entry[]>("list_trashed"),
   upsertEntry: (payload: UpsertPayload) => invoke<Entry>("upsert_entry", { payload }),
   deleteEntry: (id: string) => invoke<void>("delete_entry", { id }),
+  restoreEntry: (id: string) => invoke<Entry>("restore_entry", { id }),
+  purgeEntry: (id: string) => invoke<void>("purge_entry", { id }),
+  emptyTrash: () => invoke<number>("empty_trash"),
+  changeMasterPassword: (current: string, newPassword: string) =>
+    invoke<void>("change_master_password", { current, newPassword }),
   touchEntry: (id: string) => invoke<void>("touch_entry", { id }),
   updateSettings: (settings: VaultSettings) =>
     invoke<VaultSettings>("update_settings", { settings }),

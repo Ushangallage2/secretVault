@@ -5,6 +5,7 @@ interface Props {
   onFilter: (f: FilterKind) => void;
   path: string;
   rememberUnlock: boolean;
+  trashCount: number;
   onLogout: () => void;
   onLockRequirePassword: () => void;
   onForgetUnlock: () => void;
@@ -22,6 +23,7 @@ const FILTERS: { id: FilterKind; label: string }[] = [
   { id: "note", label: "Notes" },
   { id: "jasper", label: "Jaspers" },
   { id: "file", label: "Files" },
+  { id: "trash", label: "Trash" },
 ];
 
 export function Sidebar({
@@ -29,6 +31,7 @@ export function Sidebar({
   onFilter,
   path,
   rememberUnlock,
+  trashCount,
   onLogout,
   onLockRequirePassword,
   onForgetUnlock,
@@ -57,6 +60,7 @@ export function Sidebar({
                 onClick={() => onFilter(f.id)}
               >
                 {f.label}
+                {f.id === "trash" && trashCount > 0 ? ` (${trashCount})` : ""}
               </button>
             ))}
           </nav>

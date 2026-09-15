@@ -17,10 +17,15 @@ const CLONE_URL = "https://github.com/Ushangallage2/secretVault";
 const BUILD_GUIDE_URL = `${CLONE_URL}#build-installers-yourself`;
 
 const BUILD_HINTS: Record<string, { os: string; artifact: string; output: string }> = {
-  macos: {
-    os: "macOS",
-    artifact: ".dmg",
-    output: "src-tauri/target/release/bundle/dmg/",
+  "macos-intel": {
+    os: "an Intel Mac",
+    artifact: "Intel .dmg",
+    output: "src-tauri/target/release/bundle/dmg/ (x86_64)",
+  },
+  "macos-arm": {
+    os: "an Apple Silicon Mac",
+    artifact: "Apple Silicon .dmg",
+    output: "src-tauri/target/release/bundle/dmg/ (aarch64)",
   },
   linux: {
     os: "Linux",
@@ -34,6 +39,13 @@ const BUILD_HINTS: Record<string, { os: string; artifact: string; output: string
   },
 };
 
+function formatBackupTime(iso: string | null): string {
+  if (!iso) return "never";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString();
+}
+
 export function AboutBackup({ settings, onClose, onToast, onSettings }: Props) {
   const [about, setAbout] = useState<AppAbout | null>(null);
   const [status, setStatus] = useState<BackupStatus | null>(null);
@@ -45,6 +57,9 @@ export function AboutBackup({ settings, onClose, onToast, onSettings }: Props) {
   const [clientId, setClientId] = useState(settings.driveClientId ?? "");
   const [clientSecret, setClientSecret] = useState("");
   const [busy, setBusy] = useState(false);
+  const [currentPw, setCurrentPw] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [newPw2, setNewPw2] = useState("");
 
   const refreshMeta = async () => {
     setStatus(await api.getBackupStatus());
@@ -169,9 +184,9 @@ export function AboutBackup({ settings, onClose, onToast, onSettings }: Props) {
 
           <h3 className="about-h">Share this version</h3>
           <p className="muted tiny">
-            Save a real installer when one exists (bundled file or GitHub Release). This Mac build cannot invent
-            authentic Linux <code>.deb</code> or Windows <code>.exe</code> files — those have to be built on that OS
-            (or published later by GitHub Actions).
+            Save a real installer when one exists (bundled file or GitHub Release). macOS is split into{" "}
+            <strong>Intel</strong> and <strong>Apple Silicon</strong> — use the chip that matches the other Mac.
+            Linux <code>.deb</code> and Windows <code>.exe</code> are built on those OSes (or GitHub Actions).
           </p>
           <div className="installer-list">
             {installers.length === 0 && <p className="muted tiny">Looking up installers…</p>}
@@ -189,9 +204,11 @@ export function AboutBackup({ settings, onClose, onToast, onSettings }: Props) {
                     ) : (
                       <p className="installer-hint">
                         No real {hint?.artifact ?? "installer"} is in this copy
-                        {hint && item.id !== "macos"
+                        {hint && item.id !== "macos-intel" && item.id !== "macos-arm"
                           ? ` because it was not built on ${hint.os}`
-                          : ""}
+                          : hint
+                            ? ` — build on ${hint.os} or wait for GitHub Actions`
+                            : ""}
                         . Build it on {hint?.os ?? "that OS"}: clone{" "}
                         <code>{CLONE_URL}</code>, then <code>npm install</code> and{" "}
                         <code>npm run tauri build</code>. Typical output:{" "}
@@ -249,9 +266,27 @@ export function AboutBackup({ settings, onClose, onToast, onSettings }: Props) {
           </div>
 
           <h3 className="about-h">Cloud backup</h3>
+          <div className="backup-health">
+            <p>
+              <strong>Last successful push:</strong> {formatBackupTime(status?.lastOk ?? null)}
+              {status?.lastDetail ? <span className="muted tiny"> — {status.lastDetail}</span> : null}
+            </p>
+            <p>
+              <strong>Google Drive:</strong>{" "}
+              {status?.driveConnected
+                ? "connected"
+                : status?.driveWanted
+                  ? "disconnected (folder URL is set — connect OAuth)"
+                  : "not connected"}
+            </p>
+            {status?.lastError ? (
+              <p className="backup-health-error">Last failure: {status.lastError}</p>
+            ) : null}
+          </div>
           <p className="muted tiny">
-            Only the encrypted <code>.vault</code> file is copied. Use a Google Drive folder (Drive for Desktop) and/or
-            upload to Drive on the internet. Auto-backup runs after you save entries.
+            Only the encrypted <code>.vault</code> file is copied. Auto-backup runs after you save entries. If a push
+            fails you will see a toast. For other people to use Drive OAuth, add their Gmail as a{" "}
+            <strong>test user</strong> on the Google Cloud OAuth consent Audience page (or publish the app).
           </p>
           <label className="checkbox">
             <input
@@ -301,13 +336,57 @@ export function AboutBackup({ settings, onClose, onToast, onSettings }: Props) {
           </label>
           <p className="muted tiny">
             Google Cloud Console → OAuth client type <strong>Desktop</strong>. Redirect URI:{" "}
-            <code>http://127.0.0.1:17843</code>
+            <code>http://127.0.0.1:17843</code>. Enable Drive API. While the app is in Testing, only listed test users
+            can sign in.
           </p>
+
+          <h3 className="about-h">Change master password</h3>
           <p className="muted tiny">
-            Drive: {status?.driveConnected ? "connected" : "not connected"}
-            {status?.lastOk ? ` · ${status.lastOk}` : ""}
-            {status?.lastError ? ` · last error: ${status.lastError}` : ""}
+            Re-encrypts this vault with a new password (8+ characters). Stay-signed-in Keychain is updated if it is on.
           </p>
+          <label>
+            Current password
+            <input type="password" value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} />
+          </label>
+          <label>
+            New password
+            <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} />
+          </label>
+          <label>
+            Confirm new password
+            <input type="password" value={newPw2} onChange={(e) => setNewPw2(e.target.value)} />
+          </label>
+          <button
+            type="button"
+            className="ghost"
+            disabled={busy}
+            onClick={() =>
+              void (async () => {
+                if (newPw.length < 8) {
+                  onToast("New password must be at least 8 characters");
+                  return;
+                }
+                if (newPw !== newPw2) {
+                  onToast("New passwords do not match");
+                  return;
+                }
+                setBusy(true);
+                try {
+                  await api.changeMasterPassword(currentPw, newPw);
+                  setCurrentPw("");
+                  setNewPw("");
+                  setNewPw2("");
+                  onToast("Master password updated");
+                } catch (err) {
+                  onToast(err instanceof Error ? err.message : String(err));
+                } finally {
+                  setBusy(false);
+                }
+              })()
+            }
+          >
+            Update password
+          </button>
         </div>
         <div className="modal-actions">
           <button type="button" className="ghost" onClick={onClose}>

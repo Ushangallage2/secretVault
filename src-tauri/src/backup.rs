@@ -10,18 +10,25 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::{Read, Write};
 use std::net::TcpListener;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 const DRIVE_SCOPE: &str = "https://www.googleapis.com/auth/drive.file";
 const REDIRECT_PORT: u16 = 17843;
 const REDIRECT_URI: &str = "http://127.0.0.1:17843";
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BackupStatus {
     pub drive_connected: bool,
+    /// True when a Drive folder URL is set (even if OAuth is not connected).
+    #[serde(default)]
+    pub drive_wanted: bool,
+    /// ISO-8601 time of last successful push.
     pub last_ok: Option<String>,
+    /// Human summary of the last successful destinations.
+    #[serde(default)]
+    pub last_detail: Option<String>,
     pub last_error: Option<String>,
 }
 
@@ -29,10 +36,43 @@ impl Default for BackupStatus {
     fn default() -> Self {
         Self {
             drive_connected: keychain::has_drive_refresh(),
+            drive_wanted: false,
             last_ok: None,
+            last_detail: None,
             last_error: None,
         }
     }
+}
+
+fn meta_path(vault_path: &Path) -> PathBuf {
+    let stem = vault_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("vault");
+    match vault_path.parent() {
+        Some(dir) => dir.join(format!("{stem}.backup-status.json")),
+        None => PathBuf::from(format!("{stem}.backup-status.json")),
+    }
+}
+
+pub fn load_status(vault_path: &Path) -> BackupStatus {
+    let mut status = BackupStatus::default();
+    if let Ok(bytes) = fs::read(meta_path(vault_path)) {
+        if let Ok(saved) = serde_json::from_slice::<BackupStatus>(&bytes) {
+            status.last_ok = saved.last_ok;
+            status.last_detail = saved.last_detail;
+            status.last_error = saved.last_error;
+        }
+    }
+    status.drive_connected = keychain::has_drive_refresh();
+    status
+}
+
+pub fn store_status(vault_path: &Path, status: &BackupStatus) {
+    let _ = fs::write(
+        meta_path(vault_path),
+        serde_json::to_vec_pretty(status).unwrap_or_default(),
+    );
 }
 
 pub fn destinations_configured(settings: &VaultSettings) -> bool {
