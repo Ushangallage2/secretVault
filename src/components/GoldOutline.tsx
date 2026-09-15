@@ -81,7 +81,7 @@ export function GoldOutline() {
     let raf = 0;
     let last = 0;
     const started = performance.now();
-    const fpsGap = 1000 / 30;
+    const fpsGap = 1000 / 20;
 
     const resize = () => {
       const box = wrap.getBoundingClientRect();
@@ -105,10 +105,8 @@ export function GoldOutline() {
       const L = rimLayout(w, h, radius, inset);
       if (L.peri < 8) return;
 
-      const t = ((now - started) % 38_000) / 38_000;
+      const t = ((now - started) % 96_000) / 96_000;
       const head = t * L.peri;
-      const tailLen = Math.min(58, L.peri * 0.035);
-      const steps = 14;
 
       ctx.clearRect(0, 0, w, h);
       ctx.save();
@@ -118,36 +116,15 @@ export function GoldOutline() {
       ctx.clip("evenodd");
 
       const tip = pointOnRim(L, head);
-      const bloom = 92;
+      const bloom = 88;
       const glow = ctx.createRadialGradient(tip.x, tip.y, 0, tip.x, tip.y, bloom);
-      glow.addColorStop(0, "rgba(255, 250, 235, 1)");
-      glow.addColorStop(0.06, "rgba(255, 205, 120, 0.78)");
-      glow.addColorStop(0.18, "rgba(255, 148, 48, 0.36)");
-      glow.addColorStop(0.42, "rgba(220, 84, 16, 0.12)");
+      glow.addColorStop(0, "rgba(255, 250, 235, 0.95)");
+      glow.addColorStop(0.08, "rgba(255, 205, 120, 0.7)");
+      glow.addColorStop(0.22, "rgba(255, 148, 48, 0.32)");
+      glow.addColorStop(0.48, "rgba(220, 84, 16, 0.1)");
       glow.addColorStop(1, "rgba(0, 0, 0, 0)");
       ctx.fillStyle = glow;
       ctx.fillRect(tip.x - bloom, tip.y - bloom, bloom * 2, bloom * 2);
-
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      let prev = tip;
-      for (let i = 1; i <= steps; i++) {
-        const u = i / steps;
-        const pos = pointOnRim(L, head - u * tailLen);
-        const fade = (1 - u) ** 1.7;
-        ctx.beginPath();
-        ctx.moveTo(prev.x, prev.y);
-        ctx.lineTo(pos.x, pos.y);
-        ctx.strokeStyle = `rgba(255, ${Math.round(190 + fade * 50)}, ${Math.round(96 + fade * 90)}, ${0.04 + fade * 0.78})`;
-        ctx.lineWidth = 0.7 + fade * 2.4;
-        ctx.stroke();
-        prev = pos;
-      }
-
-      ctx.beginPath();
-      ctx.fillStyle = "rgba(255, 252, 240, 1)";
-      ctx.arc(tip.x, tip.y, 2.4, 0, Math.PI * 2);
-      ctx.fill();
       ctx.restore();
     };
 
