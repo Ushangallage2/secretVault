@@ -105,10 +105,10 @@ export function GoldOutline() {
       const L = rimLayout(w, h, radius, inset);
       if (L.peri < 8) return;
 
-      const t = ((now - started) % 14_000) / 14_000;
+      const t = ((now - started) % 38_000) / 38_000;
       const head = t * L.peri;
-      const tailLen = L.peri * 0.16;
-      const steps = 48;
+      const tailLen = Math.min(58, L.peri * 0.035);
+      const steps = 14;
 
       ctx.clearRect(0, 0, w, h);
       ctx.save();
