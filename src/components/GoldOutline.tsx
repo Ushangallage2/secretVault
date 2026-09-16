@@ -12,6 +12,17 @@ type Rim = {
   peri: number;
 };
 
+type Pulse = {
+  from: number;
+  travel: number;
+  dir: 1 | -1;
+  started: number;
+  moveMs: number;
+  fadeInMs: number;
+  fadeOutMs: number;
+  pauseMs: number;
+};
+
 function rimLayout(w: number, h: number, radius: number, inset: number): Rim {
   const x = inset;
   const y = inset;
@@ -64,7 +75,61 @@ function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: num
   ctx.closePath();
 }
 
-/** Premium border beam: thin rim light, hot tip, fading tail, outward bloom. */
+function edges(L: Rim) {
+  return [
+    { start: 0, len: L.hs },
+    { start: L.hs + L.arc, len: L.vs },
+    { start: L.hs + L.vs + 2 * L.arc, len: L.hs },
+    { start: 2 * L.hs + L.vs + 3 * L.arc, len: L.vs },
+  ].filter((e) => e.len > 40);
+}
+
+function nextPulse(L: Rim, now: number, lastEdge: number): { pulse: Pulse; edge: number } {
+  const list = edges(L);
+  const picks = list.map((_, i) => i).filter((i) => i !== lastEdge);
+  const edge = picks.length ? picks[Math.floor(Math.random() * picks.length)]! : 0;
+  const e = list[edge] ?? list[0];
+  if (!e) {
+    return {
+      pulse: {
+        from: 0,
+        travel: 1,
+        dir: 1,
+        started: now,
+        moveMs: 5000,
+        fadeInMs: 800,
+        fadeOutMs: 800,
+        pauseMs: 1800,
+      },
+      edge: 0,
+    };
+  }
+  const travel = Math.min(Math.max(90, e.len * 0.28), e.len * 0.45, 180);
+  const dir: 1 | -1 = Math.random() < 0.5 ? 1 : -1;
+  const room = e.len - travel;
+  const offset = room > 8 ? Math.random() * room : 0;
+  const from = dir === 1 ? e.start + offset : e.start + offset + travel;
+  return {
+    edge,
+    pulse: {
+      from,
+      travel,
+      dir,
+      started: now,
+      moveMs: 6400 + Math.random() * 1800,
+      fadeInMs: 900,
+      fadeOutMs: 1100,
+      pauseMs: 1600 + Math.random() * 1400,
+    },
+  };
+}
+
+function ease(u: number) {
+  const t = Math.max(0, Math.min(1, u));
+  return t * t * (3 - 2 * t);
+}
+
+/** Thin gold glow that appears on one edge, glides a short way, then fades and hops. */
 export function GoldOutline() {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -79,8 +144,9 @@ export function GoldOutline() {
     let w = 1;
     let h = 1;
     let raf = 0;
-    let last = 0;
-    const started = performance.now();
+    let lastDraw = 0;
+    let lastEdge = -1;
+    let pulse: Pulse | null = null;
     const fpsGap = 1000 / 20;
 
     const resize = () => {
@@ -93,35 +159,61 @@ export function GoldOutline() {
       canvas.style.width = `${w}px`;
       canvas.style.height = `${h}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      pulse = null;
+      lastEdge = -1;
     };
 
     const draw = (now: number) => {
       raf = window.requestAnimationFrame(draw);
-      if (now - last < fpsGap) return;
-      last = now;
+      if (now - lastDraw < fpsGap) return;
+      lastDraw = now;
 
       const inset = 2;
       const radius = 14;
       const L = rimLayout(w, h, radius, inset);
       if (L.peri < 8) return;
 
-      const t = ((now - started) % 96_000) / 96_000;
-      const head = t * L.peri;
+      if (!pulse) {
+        const next = nextPulse(L, now, lastEdge);
+        pulse = next.pulse;
+        lastEdge = next.edge;
+      }
+
+      const elapsed = now - pulse.started;
+      const visible = pulse.fadeInMs + pulse.moveMs + pulse.fadeOutMs;
+      const cycle = visible + pulse.pauseMs;
+      if (elapsed >= cycle) {
+        const next = nextPulse(L, now, lastEdge);
+        pulse = next.pulse;
+        lastEdge = next.edge;
+      }
 
       ctx.clearRect(0, 0, w, h);
+      const p = pulse;
+      const t = now - p.started;
+      if (t < 0 || t > visible) return;
+
+      let alpha = 1;
+      if (t < p.fadeInMs) alpha = ease(t / p.fadeInMs);
+      else if (t > p.fadeInMs + p.moveMs) {
+        alpha = 1 - ease((t - p.fadeInMs - p.moveMs) / p.fadeOutMs);
+      }
+      const moveU = ease(t / visible);
+      const dist = p.from + p.dir * p.travel * moveU;
+      const tip = pointOnRim(L, dist);
+
       ctx.save();
       ctx.beginPath();
       ctx.rect(0, 0, w, h);
-      roundedRect(ctx, 36, 36, Math.max(1, w - 72), Math.max(1, h - 72), Math.max(0, radius - 4));
+      roundedRect(ctx, 22, 22, Math.max(1, w - 44), Math.max(1, h - 44), Math.max(0, radius - 4));
       ctx.clip("evenodd");
+      ctx.globalAlpha = alpha;
 
-      const tip = pointOnRim(L, head);
-      const bloom = 88;
+      const bloom = 34;
       const glow = ctx.createRadialGradient(tip.x, tip.y, 0, tip.x, tip.y, bloom);
       glow.addColorStop(0, "rgba(255, 250, 235, 0.95)");
-      glow.addColorStop(0.08, "rgba(255, 205, 120, 0.7)");
-      glow.addColorStop(0.22, "rgba(255, 148, 48, 0.32)");
-      glow.addColorStop(0.48, "rgba(220, 84, 16, 0.1)");
+      glow.addColorStop(0.12, "rgba(255, 210, 130, 0.55)");
+      glow.addColorStop(0.38, "rgba(255, 160, 60, 0.18)");
       glow.addColorStop(1, "rgba(0, 0, 0, 0)");
       ctx.fillStyle = glow;
       ctx.fillRect(tip.x - bloom, tip.y - bloom, bloom * 2, bloom * 2);
