@@ -65,61 +65,32 @@ function pointOnRim(L: Rim, dist: number) {
   return { x: x + r + Math.cos(a) * r, y: y + r + Math.sin(a) * r };
 }
 
-function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
-  const rr = Math.max(0, Math.min(r, w / 2, h / 2));
-  ctx.moveTo(x + rr, y);
-  ctx.arcTo(x + w, y, x + w, y + h, rr);
-  ctx.arcTo(x + w, y + h, x, y + h, rr);
-  ctx.arcTo(x, y + h, x, y, rr);
-  ctx.arcTo(x, y, x + w, y, rr);
-  ctx.closePath();
-}
-
-function edges(L: Rim) {
+function cornerAnchors(L: Rim) {
   return [
-    { start: 0, len: L.hs },
-    { start: L.hs + L.arc, len: L.vs },
-    { start: L.hs + L.vs + 2 * L.arc, len: L.hs },
-    { start: 2 * L.hs + L.vs + 3 * L.arc, len: L.vs },
-  ].filter((e) => e.len > 40);
+    L.hs + L.arc * 0.5,
+    L.hs + L.vs + L.arc * 1.5,
+    L.hs * 2 + L.vs + L.arc * 2.5,
+    L.hs * 2 + L.vs * 2 + L.arc * 3.5,
+  ];
 }
 
-function nextPulse(L: Rim, now: number, lastEdge: number): { pulse: Pulse; edge: number } {
-  const list = edges(L);
-  const picks = list.map((_, i) => i).filter((i) => i !== lastEdge);
-  const edge = picks.length ? picks[Math.floor(Math.random() * picks.length)]! : 0;
-  const e = list[edge] ?? list[0];
-  if (!e) {
-    return {
-      pulse: {
-        from: 0,
-        travel: 1,
-        dir: 1,
-        started: now,
-        moveMs: 5000,
-        fadeInMs: 800,
-        fadeOutMs: 800,
-        pauseMs: 1800,
-      },
-      edge: 0,
-    };
-  }
-  const travel = Math.min(Math.max(90, e.len * 0.28), e.len * 0.45, 180);
+function nextPulse(L: Rim, now: number, lastCorner: number): { pulse: Pulse; corner: number } {
+  const anchors = cornerAnchors(L);
+  const picks = anchors.map((_, i) => i).filter((i) => i !== lastCorner);
+  const corner = picks[Math.floor(Math.random() * picks.length)] ?? 0;
+  const from = anchors[corner] ?? 0;
   const dir: 1 | -1 = Math.random() < 0.5 ? 1 : -1;
-  const room = e.len - travel;
-  const offset = room > 8 ? Math.random() * room : 0;
-  const from = dir === 1 ? e.start + offset : e.start + offset + travel;
   return {
-    edge,
+    corner,
     pulse: {
       from,
-      travel,
+      travel: 110 + Math.random() * 50,
       dir,
       started: now,
-      moveMs: 6400 + Math.random() * 1800,
-      fadeInMs: 900,
-      fadeOutMs: 1100,
-      pauseMs: 1600 + Math.random() * 1400,
+      moveMs: 7200 + Math.random() * 1600,
+      fadeInMs: 1100,
+      fadeOutMs: 1400,
+      pauseMs: 900 + Math.random() * 900,
     },
   };
 }
@@ -129,7 +100,7 @@ function ease(u: number) {
   return t * t * (3 - 2 * t);
 }
 
-/** Thin gold glow that appears on one edge, glides a short way, then fades and hops. */
+/** Cinematic corner catch-light: thin chrome rim, hot vertex, large outer orange bloom. */
 export function GoldOutline() {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -145,9 +116,9 @@ export function GoldOutline() {
     let h = 1;
     let raf = 0;
     let lastDraw = 0;
-    let lastEdge = -1;
+    let lastCorner = -1;
     let pulse: Pulse | null = null;
-    const fpsGap = 1000 / 20;
+    const fpsGap = 1000 / 24;
 
     const resize = () => {
       const box = wrap.getBoundingClientRect();
@@ -160,7 +131,7 @@ export function GoldOutline() {
       canvas.style.height = `${h}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       pulse = null;
-      lastEdge = -1;
+      lastCorner = -1;
     };
 
     const draw = (now: number) => {
@@ -168,24 +139,20 @@ export function GoldOutline() {
       if (now - lastDraw < fpsGap) return;
       lastDraw = now;
 
-      const inset = 2;
-      const radius = 14;
-      const L = rimLayout(w, h, radius, inset);
+      const L = rimLayout(w, h, 16, 1.25);
       if (L.peri < 8) return;
 
       if (!pulse) {
-        const next = nextPulse(L, now, lastEdge);
+        const next = nextPulse(L, now, lastCorner);
         pulse = next.pulse;
-        lastEdge = next.edge;
+        lastCorner = next.corner;
       }
 
-      const elapsed = now - pulse.started;
       const visible = pulse.fadeInMs + pulse.moveMs + pulse.fadeOutMs;
-      const cycle = visible + pulse.pauseMs;
-      if (elapsed >= cycle) {
-        const next = nextPulse(L, now, lastEdge);
+      if (now - pulse.started >= visible + pulse.pauseMs) {
+        const next = nextPulse(L, now, lastCorner);
         pulse = next.pulse;
-        lastEdge = next.edge;
+        lastCorner = next.corner;
       }
 
       ctx.clearRect(0, 0, w, h);
@@ -195,28 +162,50 @@ export function GoldOutline() {
 
       let alpha = 1;
       if (t < p.fadeInMs) alpha = ease(t / p.fadeInMs);
-      else if (t > p.fadeInMs + p.moveMs) {
-        alpha = 1 - ease((t - p.fadeInMs - p.moveMs) / p.fadeOutMs);
-      }
-      const moveU = ease(t / visible);
-      const dist = p.from + p.dir * p.travel * moveU;
+      else if (t > p.fadeInMs + p.moveMs) alpha = 1 - ease((t - p.fadeInMs - p.moveMs) / p.fadeOutMs);
+
+      const dist = p.from + p.dir * p.travel * ease(t / visible);
       const tip = pointOnRim(L, dist);
 
       ctx.save();
-      ctx.beginPath();
-      ctx.rect(0, 0, w, h);
-      roundedRect(ctx, 22, 22, Math.max(1, w - 44), Math.max(1, h - 44), Math.max(0, radius - 4));
-      ctx.clip("evenodd");
       ctx.globalAlpha = alpha;
 
-      const bloom = 34;
-      const glow = ctx.createRadialGradient(tip.x, tip.y, 0, tip.x, tip.y, bloom);
-      glow.addColorStop(0, "rgba(255, 250, 235, 0.95)");
-      glow.addColorStop(0.12, "rgba(255, 210, 130, 0.55)");
-      glow.addColorStop(0.38, "rgba(255, 160, 60, 0.18)");
-      glow.addColorStop(1, "rgba(0, 0, 0, 0)");
-      ctx.fillStyle = glow;
+      const bloom = 120;
+      const haze = ctx.createRadialGradient(tip.x, tip.y, 0, tip.x, tip.y, bloom);
+      haze.addColorStop(0, "rgba(255, 236, 200, 0.55)");
+      haze.addColorStop(0.08, "rgba(255, 176, 72, 0.42)");
+      haze.addColorStop(0.22, "rgba(255, 122, 28, 0.22)");
+      haze.addColorStop(0.48, "rgba(220, 70, 8, 0.08)");
+      haze.addColorStop(1, "rgba(0, 0, 0, 0)");
+      ctx.fillStyle = haze;
       ctx.fillRect(tip.x - bloom, tip.y - bloom, bloom * 2, bloom * 2);
+
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      const span = 150;
+      const steps = 42;
+      let prev = pointOnRim(L, dist - span);
+      for (let i = 1; i <= steps; i++) {
+        const offset = -span + (i / steps) * span * 2;
+        const pos = pointOnRim(L, dist + offset);
+        const fade = Math.exp(-Math.abs(offset) / 52);
+        ctx.beginPath();
+        ctx.moveTo(prev.x, prev.y);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.strokeStyle = `rgba(255, ${Math.round(214 + fade * 30)}, ${Math.round(150 + fade * 70)}, ${fade * 0.92})`;
+        ctx.lineWidth = 0.7 + fade * 1.35;
+        ctx.stroke();
+        prev = pos;
+      }
+
+      const core = ctx.createRadialGradient(tip.x, tip.y, 0, tip.x, tip.y, 18);
+      core.addColorStop(0, "rgba(255, 252, 240, 1)");
+      core.addColorStop(0.35, "rgba(255, 220, 140, 0.7)");
+      core.addColorStop(1, "rgba(255, 160, 50, 0)");
+      ctx.fillStyle = core;
+      ctx.beginPath();
+      ctx.arc(tip.x, tip.y, 18, 0, Math.PI * 2);
+      ctx.fill();
       ctx.restore();
     };
 
