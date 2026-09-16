@@ -482,7 +482,7 @@ mod tests {
         assert_eq!(marketing_version("2.5.0"), "2.5");
         assert_eq!(marketing_version("v2.5.0"), "2.5");
         assert_eq!(marketing_version("2.5.1"), "2.5.1");
-        assert_eq!(window_title(), "Secret Vault v2.6.6");
+        assert_eq!(window_title(), "Secret Vault v2.6.7");
     }
 
     #[test]
